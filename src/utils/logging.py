@@ -1,0 +1,3 @@
+import logging
+
+def getLogger():

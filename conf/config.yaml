@@ -1,0 +1,16 @@
+training:
+    model: "meta-llama/Llama-2-7b"
+
+optimiser:
+    lr: 1e-3
+    optimiser: adamw
+    iter: 5000
+
+
+# EXAMPLE PARAM SWEEP. Will execute the main.py main entry point 4 times in total
+# hydra:
+#     mode: MULTIRUN
+#     sweeper:
+#         params:
+#           ++training.model: meta-llama/Llama-2-7b, meta-llama/Llama-2-13b
+#           ++optimiser.iter: 5000, 10000
