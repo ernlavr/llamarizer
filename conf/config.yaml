@@ -1,16 +1,18 @@
-training:
-    model: "meta-llama/Llama-2-7b"
+# Config for running WANDB param-sweeps
+# Reference: https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+# Create a sweep agent: wandb
 
-optimiser:
-    lr: 1e-3
-    optimiser: adamw
-    iter: 5000
-
-
-# EXAMPLE PARAM SWEEP. Will execute the main.py main entry point 4 times in total
-# hydra:
-#     mode: MULTIRUN
-#     sweeper:
-#         params:
-#           ++training.model: meta-llama/Llama-2-7b, meta-llama/Llama-2-13b
-#           ++optimiser.iter: 5000, 10000
+program: main.py
+method: grid # grid, bayes, random
+parameters:
+  learning_rate:
+    values:
+      - 0.001
+      - 0.0001
+  optimizer:
+    values: ["adam"]
+metric:
+  name: validation_loss # remember to log val_loss https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+  goal: minimize
+command:
+  - $
