@@ -8,9 +8,12 @@
 #SBATCH --output=job.%j.out # (%j expands to jobId)
 #SBATCH --mail-type=FAIL
 
+# Queue to HPC `sbatch ./run_hpc.sh`; view queue `squeue`
+
 module purge
 conda init
 conda activate /home/$USER/.conda/envs/hackathon
 
 echo "Starting python"
 python3 main.py
+echo "Done ./run_hpc.sh"
