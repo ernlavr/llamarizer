@@ -1,12 +1,9 @@
 import logging
 import os
 import wandb
-import argparse
-import transformers
 import src.utils.utilities as utils
 from src.ml.summarizer import Summarizer
 
-from omegaconf import DictConfig, OmegaConf
 from huggingface_hub.hf_api import HfFolder
 
 
