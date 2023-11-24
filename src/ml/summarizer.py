@@ -18,8 +18,6 @@ class Summarizer(bs.BaseModel):
         self.batch_size         = wandb.config.batch_size
         self.sequence_length    = wandb.config.sequence_length
 
-        return
-
         # Tokenizer
         self.tokenizer = transformers.LlamaTokenizer.from_pretrained(self.name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
