@@ -1,7 +1,10 @@
 import torch
-import transformers
 import wandb
-from peft import LoraConfig, TaskType, prepare_model_for_kbit_training
+from peft import (
+    LoraConfig,
+    TaskType,
+    prepare_model_for_kbit_training,
+)
 
 import src.ml.baseModel as bs
 
