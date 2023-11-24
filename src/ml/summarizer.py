@@ -5,7 +5,7 @@ from peft import (
     TaskType,
     prepare_model_for_kbit_training,
 )
-
+import transformers
 import src.ml.baseModel as bs
 
 
@@ -21,8 +21,10 @@ class Summarizer(bs.BaseModel):
         self.batch_size = wandb.config.batch_size
         self.sequence_length = wandb.config.sequence_length
 
+        # Dataset
+
         # Tokenizer
-        self.tokenizer = transformers.LlamaTokenizer.from_pretrained(self.name)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         print(f"Tokenizer: {self.tokenizer.eos_token}; Pad {self.tokenizer.pad_token}")
 
@@ -40,7 +42,7 @@ class Summarizer(bs.BaseModel):
             lora_dropout=0.05,
             bias="none",
         )
-        self.model = transformers.LlamaForCausalLM.from_pretrained(
+        self.model = transformers.AutoModelForCausalLM.from_pretrained(
             self.name, quantization_config=self.bnb_config, device_map="auto"
         )
         self.model.config.pad_token_id = self.model.config.eos_token_id

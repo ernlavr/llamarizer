@@ -55,7 +55,6 @@ def main():
     print("Done!")
     print(wandb.config["learning_rate"])
 
-    xSumDataset = xSum.XSum()
     summarizer = Summarizer()
 
 
