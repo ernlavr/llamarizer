@@ -2,7 +2,7 @@ import abc
 
 class BaseModel(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def fit(self, X, y):
+    def train(self, X, y):
         pass
 
     @abc.abstractmethod
@@ -10,13 +10,9 @@ class BaseModel(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def score(self, X, y):
+    def collate_fn(self, batch):
         pass
 
     @abc.abstractmethod
-    def save(self, path):
-        pass
-
-    @abc.abstractmethod
-    def load(self, path):
+    def tokenize(self, text):
         pass

@@ -1,0 +1,10 @@
+# control
+wandb_mode : "offline"
+
+# Hyperparameters
+learning_rate: 0.0001
+epochs: 5
+weight_decay : 0.01
+batch_size : 32
+sequence_length : 512
+model_name : "meta-llama/Llama-2-7b-hf"

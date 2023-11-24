@@ -4,6 +4,7 @@ import wandb
 import argparse
 import transformers
 import src.utils.utilities as utils
+from src.ml.summarizer import Summarizer
 
 from omegaconf import DictConfig, OmegaConf
 from huggingface_hub.hf_api import HfFolder
@@ -12,15 +13,19 @@ from huggingface_hub.hf_api import HfFolder
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-def setupEnvVariables():
+def setupEnvVariables(args):
     os.environ['WANDB_API_KEY'] = '3e554d2dafac7c22b4e348afff4b69a9e6d49e81'
     os.environ['WANDB_PROJECT'] = 'adv_nlp2023'
+    os.environ['WANDB_MODE'] = args.wandb_mode
     os.environ["WANDB_LOG_MODEL"] = 'checkpoint' # 'checkpoint' or 
     os.environ['HF_TOKEN'] = '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'
     HfFolder.save_token(os.environ['HF_TOKEN'])
 
-def initWandb():
-    wandb.init(project="adv_nlp2023")
+def initWandb(config=None):
+    if config is None:
+        return wandb.init(project="adv_nlp2023")
+    else:
+        return wandb.init(project="adv_nlp2023", config=config)
 
 def main():
     """ Main entry point for the software. Essentially able to deligate execution to
@@ -37,24 +42,21 @@ def main():
         See the config file for an example parameter sweep
     """
     # save the cfg to a global variable so it can be accessed anywhere
-    setupEnvVariables()
     args = utils.getArgs()
-    initWandb()
-    print(args)
+    setupEnvVariables(args)
+    run = initWandb(args)
 
     # log some example loss
     for i in range(100):
         wandb.log({"loss": i})
 
     # log a message that training is complete
-    wandb.log({"message": "Training complete!"})
     print("Done!")
-    print(args.no_wandb)
+    print(wandb.config["learning_rate"])
 
-    # set log level to debug
-    log.setLevel(logging.DEBUG)
-    log.error("This is an error message")
-    log.info("This is an info message")
+    summarizer = Summarizer()
+
+    
 
 
 

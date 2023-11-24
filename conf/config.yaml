@@ -1,10 +1,12 @@
 # Config for running WANDB param-sweeps
 # Reference: https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
-# Create a sweep agent: wandb
+# Create a sweep agent: `wandb sweep --project adv_nlp2023 conf/config.yaml`
 
 program: main.py
 method: grid # grid, bayes, random
 parameters:
+  wandb_mode :
+    values : ["offline"]
   learning_rate:
     values:
       - 0.001
@@ -12,7 +14,5 @@ parameters:
   optimizer:
     values: ["adam"]
 metric:
-  name: validation_loss # remember to log val_loss https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+  name: validation_loss # https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
   goal: minimize
-command:
-  - $
