@@ -7,8 +7,8 @@ class XSum:
     def __init__(self, tokenizer) -> None:
         self.tokenizer = tokenizer
         self.dataset = datasets.load_dataset("EdinburghNLP/xsum")
-        self.train = self.dataset["train"].shuffle(seed=42).select(range(8))
-        self.val = self.dataset["validation"].shuffle(seed=42).select(range(2))
+        self.train = self.dataset["train"].shuffle(seed=42).select(range(1600))
+        self.val = self.dataset["validation"].shuffle(seed=42).select(range(160))
 
         # hyperparameters
         self.sequence_length = wandb.config.sequence_length

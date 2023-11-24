@@ -4,6 +4,7 @@ from peft import (
     LoraConfig,
     TaskType,
     prepare_model_for_kbit_training,
+    get_peft_model,
 )
 import transformers
 import src.ml.baseModel as bs
@@ -30,11 +31,17 @@ class Summarizer(bs.BaseModel):
         self.rouge = evaluate.load('rouge')
 
         # Tokenizer
+        print("Loading tokenizer")
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        # Dataset
+        print("Loading dataset")
+        self.dataset = xSum.XSum(self.tokenize)
+
         # Model
+        print("Loading model")
         self.bnb_config = transformers.BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
@@ -51,9 +58,6 @@ class Summarizer(bs.BaseModel):
         self.model = self.get_model()
         if not self.model.config.pad_token_id:
             self.model.config.pad_token_id = self.model.config.eos_token_id
-
-        # Dataset
-        self.dataset = xSum.XSum(self.tokenize)
         
 
     def get_model(self):
@@ -62,7 +66,8 @@ class Summarizer(bs.BaseModel):
             model = transformers.AutoModelForCausalLM.from_pretrained(
                 self.model_name, quantization_config=self.bnb_config, device_map="auto"
             )
-            model = prepare_model_for_kbit_training(self.model)
+            model = prepare_model_for_kbit_training(model)
+            model = get_peft_model(model, self.peft_config)
         else:
             model = transformers.AutoModelForCausalLM.from_pretrained(
                 self.model_name
@@ -105,9 +110,9 @@ class Summarizer(bs.BaseModel):
         )
 
     def collate_fn(self, batch):
-        input_ids = torch.stack([torch.tensor(x["input_ids"]) for x in batch])
-        attention_mask = torch.stack([torch.tensor(x["attention_mask"]) for x in batch])
-        labels = torch.stack([torch.tensor(x["labels"]) for x in batch])
+        input_ids = torch.stack([torch.tensor(x["input_ids"]) for x in batch])[None,:]
+        attention_mask = torch.stack([torch.tensor(x["attention_mask"]) for x in batch])[None,:]
+        labels = torch.stack([torch.tensor(x["labels"]) for x in batch])[None,:]
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -136,8 +141,10 @@ class Summarizer(bs.BaseModel):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_steps=50,
-            fp16=True if self.device == "cuda" else False, # use FP16 if GPU
-            hub_token="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",  # TODO use organization?
+            fp16=True,
+            gradient_checkpointing=True,        
+            optim = "paged_adamw_32bit",
+            hub_token="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"
         )
 
         trainer = transformers.Trainer(

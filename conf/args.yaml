@@ -1,5 +1,5 @@
 # control
-wandb_mode : "offline"
+wandb_mode : "online"
 
 # Hyperparameters
 learning_rate: 0.0001
@@ -7,7 +7,7 @@ epochs: 5
 weight_decay : 0.01
 batch_size : 2
 sequence_length : 1024
-model_name : "distilgpt2"
+model_name : "meta-llama/Llama-2-7b-hf"
 
 # Quantization (necessary for Llama2)
-load_in_4bit: False
+load_in_4bit: True
