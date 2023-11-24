@@ -26,5 +26,7 @@ def getArgs():
         args = omegaconf.OmegaConf.load(args.args_path)
         # convert to argparse
         args = omegaconf.OmegaConf.to_container(args, resolve=True)
+        # convert to namespace
+        args = argparse.Namespace(**args)
 
     return args
