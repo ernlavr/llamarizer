@@ -21,6 +21,9 @@ def getArgs():
     )
     parser.add_argument("--model_name", type=str, default="gpt2", help="Model name")
     parser.add_argument("--wandb_mode", type=str, default="online", help="Wandb mode")
+    parser.add_argument(
+        "--load_in_4bit", action="store_true", help="Load in 4bit weights", default=False
+    )
 
     # other stuff
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")

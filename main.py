@@ -47,15 +47,8 @@ def main():
     setupEnvVariables(args)
     run = initWandb(args)
 
-    # log some example loss
-    for i in range(100):
-        wandb.log({"loss": i})
-
-    # log a message that training is complete
-    print("Done!")
-    print(wandb.config["learning_rate"])
-
     summarizer = Summarizer()
+    summarizer.train()
 
 
 if __name__ == "__main__":

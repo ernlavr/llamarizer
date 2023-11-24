@@ -7,26 +7,32 @@ from peft import (
 )
 import transformers
 import src.ml.baseModel as bs
+import src.datasets.xSum as xSum
+import evaluate
+import numpy as np
 
 
 class Summarizer(bs.BaseModel):
     def __init__(self):
         print(f"GPUs available: {torch.cuda.device_count()}")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Hyperparameters
-        self.model = wandb.config.model_name
+        self.model_name = wandb.config.model_name
         self.learning_rate = wandb.config.learning_rate
         self.weight_decay = wandb.config.weight_decay
         self.epochs = wandb.config.epochs
         self.batch_size = wandb.config.batch_size
         self.sequence_length = wandb.config.sequence_length
+        self.load_in_4bit = wandb.config.load_in_4bit
 
-        # Dataset
+        # metrics
+        self.rouge = evaluate.load('rouge')
 
         # Tokenizer
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.name)
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        print(f"Tokenizer: {self.tokenizer.eos_token}; Pad {self.tokenizer.pad_token}")
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
+        if not self.tokenizer.pad_token:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Model
         self.bnb_config = transformers.BitsAndBytesConfig(
@@ -42,13 +48,53 @@ class Summarizer(bs.BaseModel):
             lora_dropout=0.05,
             bias="none",
         )
-        self.model = transformers.AutoModelForCausalLM.from_pretrained(
-            self.name, quantization_config=self.bnb_config, device_map="auto"
-        )
-        self.model.config.pad_token_id = self.model.config.eos_token_id
+        self.model = self.get_model()
+        if not self.model.config.pad_token_id:
+            self.model.config.pad_token_id = self.model.config.eos_token_id
+
+        # Dataset
+        self.dataset = xSum.XSum(self.tokenize)
+        
+
+    def get_model(self):
+        model = None
+        if self.load_in_4bit:
+            model = transformers.AutoModelForCausalLM.from_pretrained(
+                self.model_name, quantization_config=self.bnb_config, device_map="auto"
+            )
+            model = prepare_model_for_kbit_training(self.model)
+        else:
+            model = transformers.AutoModelForCausalLM.from_pretrained(
+                self.model_name
+            )
+
+        return model
 
     def compute_metrics(self, eval_pred):
-        pass
+        """ Eval_pred consists of a tuple of predictions and labels
+            predictions (1, 1, 1024, 50257)
+            labels (1, 1, 1024)
+        """
+        # if eval_pred is torch, make it numpy
+        if isinstance(eval_pred[0], torch.Tensor):
+            eval_pred = [(x[1].detach().cpu().numpy(), x[1].detach().cpu().numpy()) for x in eval_pred]
+
+        # compute ROUGE
+        predictions, labels = np.squeeze(eval_pred[0]), np.squeeze(eval_pred[1])
+        # take softmax over logits
+        predictions = np.argmax(predictions, axis=-1)
+
+        predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+        
+        rouge = self.rouge.compute(predictions=predictions, references=labels)
+        wandb.log({"rouge1": rouge["rouge1"]})
+        wandb.log({"rouge2": rouge["rouge2"]})
+        wandb.log({"rougeL": rouge["rougeL"]})
+        wandb.log({"rougeLsum": rouge["rougeLsum"]})
+
+
+        return {'rouge': rouge}
 
     def tokenize(self, text):
         return self.tokenizer(
@@ -59,9 +105,9 @@ class Summarizer(bs.BaseModel):
         )
 
     def collate_fn(self, batch):
-        input_ids = torch.cat([torch.tensor(x["input_ids"]) for x in batch])
-        attention_mask = torch.cat([torch.tensor(x["attention_mask"]) for x in batch])
-        labels = torch.tensor([x["labels"] for x in batch])
+        input_ids = torch.stack([torch.tensor(x["input_ids"]) for x in batch])
+        attention_mask = torch.stack([torch.tensor(x["attention_mask"]) for x in batch])
+        labels = torch.stack([torch.tensor(x["labels"]) for x in batch])
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -70,12 +116,10 @@ class Summarizer(bs.BaseModel):
 
     def train(self):
         # Prepare the model for training
-        self.model = prepare_model_for_kbit_training(self.model)
-
         training_args = transformers.TrainingArguments(
             report_to="wandb",
             output_dir="./results",
-            learning_rate=self.lr,
+            learning_rate=self.learning_rate,
             warmup_ratio=0.1,
             max_grad_norm=0.3,
             weight_decay=self.weight_decay,
@@ -88,23 +132,21 @@ class Summarizer(bs.BaseModel):
             logging_steps=10,
             do_eval=True,
             metric_for_best_model="eval_loss",
-            push_to_hub_model_id="Llama-2-7b-XSum-4bit",
+            push_to_hub_model_id=self.model_name + "4bit-xsum",
             evaluation_strategy="epoch",
             save_strategy="epoch",
             save_steps=50,
-            fp16=True,
-            gradient_checkpointing=True,
-            optim="paged_adamw_32bit",
+            fp16=True if self.device == "cuda" else False, # use FP16 if GPU
             hub_token="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",  # TODO use organization?
         )
 
         trainer = transformers.Trainer(
             model=self.model,
             args=training_args,
-            train_dataset=self.train_dataset,
-            eval_dataset=self.eval_dataset,
+            train_dataset=self.dataset.train_tokenized,
+            eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
-            data_collator=self.collate_fn,
+            data_collator=transformers.default_data_collator,
             compute_metrics=self.compute_metrics,
         )
 
