@@ -110,9 +110,9 @@ class Summarizer(bs.BaseModel):
         )
 
     def collate_fn(self, batch):
-        input_ids = torch.stack([torch.tensor(x["input_ids"]) for x in batch])[None,:]
-        attention_mask = torch.stack([torch.tensor(x["attention_mask"]) for x in batch])[None,:]
-        labels = torch.stack([torch.tensor(x["labels"]) for x in batch])[None,:]
+        input_ids = torch.vstack([torch.tensor(x["input_ids"]) for x in batch])
+        attention_mask = torch.vstack([torch.tensor(x["attention_mask"]) for x in batch])
+        labels = torch.vstack([torch.tensor(x["labels"]) for x in batch])
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -153,7 +153,7 @@ class Summarizer(bs.BaseModel):
             train_dataset=self.dataset.train_tokenized,
             eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
-            data_collator=transformers.default_data_collator,
+            data_collator=self.collate_fn,
             compute_metrics=self.compute_metrics,
         )
 
