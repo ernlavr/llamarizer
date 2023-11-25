@@ -105,13 +105,54 @@ class Summarizer(bs.BaseModel):
         return self.tokenizer(
             text,
             return_tensors="pt",
-            padding="max_length",
-            max_length=self.sequence_length,
         )
+    
+    def collate_fn_padding(self, batch):
+        # Get the maximum sequence length in the batch
+        max_len = max([x["input_ids"].shape[1] for x in batch])
+        max_label_len = max([x["labels"].shape[1] for x in batch])
+
+        # Pad input_ids and attention_mask
+        padded_input_list = []
+        padded_attention_mask = []
+        padded_labels = []
+
+        for x in batch:
+            # Pad input_ids
+            pad_length = max_len - x["input_ids"].shape[1]
+            pad_label_length = max_label_len - x["labels"].shape[1]
+
+            input_ids_detached = x["input_ids"].detach().cpu().numpy().squeeze()
+            input_ids_padded = np.concatenate((input_ids_detached, [self.tokenizer.pad_token_id] * pad_length))
+            padded_input_list.append(input_ids_padded)
+
+            # Pad attention_mask
+            mask_detached = x["attention_mask"].detach().cpu().numpy().squeeze()
+            mask_padded = np.concatenate((mask_detached, [0] * pad_length))
+            padded_attention_mask.append(mask_padded)
+
+            # Pad labels
+            labels_detached = x["labels"].detach().cpu().numpy().squeeze()
+            labels_padded = np.concatenate((labels_detached, [self.tokenizer.pad_token_id] * pad_label_length))
+            padded_labels.append(labels_padded)
+
+        input_ids = torch.tensor(padded_input_list, dtype=torch.long).unsqueeze(1)
+        attention_mask = torch.tensor(padded_attention_mask, dtype=torch.long).unsqueeze(1)
+        labels = torch.tensor(padded_labels, dtype=torch.long).unsqueeze(1)
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+        }
+
 
     def collate_fn(self, batch):
-        input_ids = torch.vstack([torch.tensor(x["input_ids"]) for x in batch])
-        attention_mask = torch.vstack([torch.tensor(x["attention_mask"]) for x in batch])
+        # pad the input_ids and attention_mask to the longest sequence in the batch
+        max_seq = max([x["input_ids"].shape[1] for x in batch])
+        
+        input_ids = torch.vstack([torch.cat(x["input_ids"], [self.tokenizer.pad_token_id] * (max_seq - x["input_ids"].shape[1])) for x in batch])
+        attention_mask = torch.vstack([torch.cat(x["attention_mask"], [0] * (max_seq - x["attention_mask"].shape[1])) for x in batch])
         labels = torch.vstack([torch.tensor(x["labels"]) for x in batch])
         return {
             "input_ids": input_ids,
@@ -138,9 +179,9 @@ class Summarizer(bs.BaseModel):
             do_eval=True,
             metric_for_best_model="eval_loss",
             push_to_hub_model_id=self.model_name + "4bit-xsum",
-            evaluation_strategy="epoch",
-            save_strategy="epoch",
-            save_steps=50,
+            evaluation_strategy="steps",
+            save_strategy="steps",
+            save_steps=1000,
             fp16=True,
             gradient_checkpointing=True,        
             optim = "paged_adamw_32bit",
@@ -153,7 +194,7 @@ class Summarizer(bs.BaseModel):
             train_dataset=self.dataset.train_tokenized,
             eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
-            data_collator=self.collate_fn,
+            data_collator=self.collate_fn_padding,
             compute_metrics=self.compute_metrics,
         )
 

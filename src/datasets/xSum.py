@@ -7,8 +7,8 @@ class XSum:
     def __init__(self, tokenizer) -> None:
         self.tokenizer = tokenizer
         self.dataset = datasets.load_dataset("EdinburghNLP/xsum")
-        self.train = self.dataset["train"].shuffle(seed=42).select(range(1600))
-        self.val = self.dataset["validation"].shuffle(seed=42).select(range(160))
+        self.train = self.dataset["train"].shuffle(seed=42).select(range(wandb.config.train_size))
+        self.val = self.dataset["validation"].shuffle(seed=42).select(range(wandb.config.val_size))
 
         # hyperparameters
         self.sequence_length = wandb.config.sequence_length
@@ -22,7 +22,11 @@ class XSum:
         output_text = []
         skipped = 0
         for i, text in enumerate(dataset):
-            tok_doc = self.tokenizer(text["document"])
+            document = text["document"]
+            if wandb.config.use_prompt:
+                document = f"Summarize: `{document}` \n\nOutput:"
+
+            tok_doc = self.tokenizer(document)
             tok_sum = self.tokenizer(text["summary"])
             tok_doc.data["labels"] = tok_sum["input_ids"]
 

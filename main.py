@@ -16,7 +16,7 @@ def setupEnvVariables(args):
     os.environ["WANDB_API_KEY"] = "3e554d2dafac7c22b4e348afff4b69a9e6d49e81"
     os.environ["WANDB_PROJECT"] = "adv_nlp2023"
     os.environ["WANDB_MODE"] = args.wandb_mode
-    os.environ["WANDB_LOG_MODEL"] = "epoch"  # 'checkpoint' or
+    os.environ["WANDB_LOG_MODEL"] = "step"  # 'checkpoint' or
     os.environ["HF_TOKEN"] = "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"
     HfFolder.save_token(os.environ["HF_TOKEN"])
 
