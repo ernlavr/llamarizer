@@ -32,7 +32,7 @@ class Summarizer(bs.BaseModel):
 
         # Tokenizer
         print("Loading tokenizer")
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
+        self.tokenizer = transformers.LlamaTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -89,6 +89,9 @@ class Summarizer(bs.BaseModel):
         # take softmax over logits
         predictions = np.argmax(predictions, axis=-1)
 
+        print([(min(l), max(l)) for l in labels])
+        print([(min(l), max(l)) for l in predictions])
+
         predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
         labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
         
@@ -110,11 +113,10 @@ class Summarizer(bs.BaseModel):
     def collate_fn(self, batch):
         # pad the input_ids and attention_mask to the longest sequence in the batch
         inputs = [x["input_ids"] for x in batch]
-        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='longest')
-        inputs_length = inputs_tokenized.data["input_ids"].shape[1]
+        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='max_length', max_length=self.sequence_length, truncation=True)
         
         labels = [x["labels"] for x in batch]
-        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=inputs_length)
+        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=self.sequence_length, truncation=True)
 
         
         input_ids = inputs_tokenized.data["input_ids"]
@@ -131,29 +133,37 @@ class Summarizer(bs.BaseModel):
     def train(self):
         # Prepare the model for training
         training_args = transformers.TrainingArguments(
+            # logging
             report_to="wandb",
             output_dir="./results",
+            logging_dir="./logs",
+            logging_steps=10,
+            do_eval=True,
+            evaluation_strategy="epoch",
+            save_strategy="epoch",
+            save_steps=1000,
+            eval_steps=100,
+
+            # hyperparameters
             learning_rate=self.learning_rate,
             warmup_ratio=0.1,
             max_grad_norm=0.3,
             weight_decay=self.weight_decay,
-            load_best_model_at_end=True,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
             warmup_steps=500,
-            logging_dir="./logs",
-            logging_steps=10,
-            do_eval=True,
             metric_for_best_model="eval_loss",
-            push_to_hub_model_id=self.model_name + "4bit-xsum",
-            evaluation_strategy="steps",
-            save_strategy="steps",
-            save_steps=1000,
-            fp16=True,
-            gradient_checkpointing=True,        
-            optim = "paged_adamw_32bit",
-            hub_token="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"
+            
+            # huggingface
+            push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
+            hub_token="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",
+            load_best_model_at_end=True,
+
+            # model quantization stuff
+            fp16=wandb.config.load_in_4bit,
+            gradient_checkpointing=wandb.config.load_in_4bit,        
+            optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw"
         )
 
         trainer = transformers.Trainer(

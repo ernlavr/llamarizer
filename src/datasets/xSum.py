@@ -24,7 +24,7 @@ class XSum:
             tok_sum = text["summary"]
 
             if wandb.config.use_prompt:
-                document = f"Summarize: `{document}` \n\nOutput:"
+                document = f"Summarize: '{document}' Output:"
 
             tokenized = self.tokenizer(document)
 
