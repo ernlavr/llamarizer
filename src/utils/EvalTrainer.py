@@ -28,6 +28,21 @@ class CustomTrainer(transformers.Trainer):
         rouge = self.rouge.compute(predictions=predictions, references=labels)
         return rouge
 
+    def push_artifacts_table(self, epoch, loss, r1, r2, source, prediction, target):
+        """ Returns a wandb.Table object containing all the artifacts
+            in the run
+        """
+        r1 = np.mean(r1)
+        r2 = np.mean(r2)
+        text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
+        for i in range(2):
+            source_i = self.tokenizer.decode(source[i])
+            target_i = self.tokenizer.decode(target[i])
+            prediction_i = self.tokenizer.decode(prediction[i])
+
+            text_table.add_data(epoch, loss, r1, r2, source_i, target_i, prediction_i)
+        wandb.run.log({'Training_Samples' : text_table})
+
 
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
@@ -63,4 +78,5 @@ class CustomTrainer(transformers.Trainer):
         avg_loss = total_loss / total_steps
         self.model.train()
         wandb.log({"eval_loss": avg_loss})
+        self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], inputs["input_ids"], outputs, inputs["labels"])
         return {"eval_loss": avg_loss}
