@@ -47,6 +47,8 @@ class Summarizer(bs.BaseModel):
         # Dataset
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenize)
+         # 0.5 epoch
+        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.batch_size / 2)
 
         # Model
         print("Loading model")
@@ -157,7 +159,7 @@ class Summarizer(bs.BaseModel):
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
-            warmup_steps=500,
+            warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
             eval_accumulation_steps=1,
             

@@ -62,4 +62,5 @@ class CustomTrainer(transformers.Trainer):
         # finish up
         avg_loss = total_loss / total_steps
         self.model.train()
+        wandb.log({"eval_loss": avg_loss})
         return {"eval_loss": avg_loss}

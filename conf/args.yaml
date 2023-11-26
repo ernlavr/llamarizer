@@ -3,16 +3,16 @@ wandb_mode : "online"
 
 # Hyperparameters
 learning_rate: 1e-4
-epochs: 10
+epochs: 5
 weight_decay : 0.01
-batch_size : 48
+batch_size : 32
 sequence_length : 512
 model_name : "meta-llama/Llama-2-7b-hf"
 
 # dataset
 train_size: 20000
 val_size: 1000
-use_prompt: True
+use_prompt: False
 
 # Quantization (necessary for Llama2)
 load_in_4bit: True
