@@ -26,6 +26,7 @@ class XSum:
             if wandb.config.use_prompt:
                 document = f"Write a summary of the following: '{document}' \n\nSummary:"
 
+
             tokenized = self.tokenizer(document)
 
             # if labels or input_ids are longer than sequence length, skip

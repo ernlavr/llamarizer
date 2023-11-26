@@ -141,6 +141,7 @@ class Summarizer(bs.BaseModel):
     def train(self):
         # Prepare the model for training
         training_args = transformers.TrainingArguments(
+            # logging
             report_to="wandb",
             output_dir="./results",
             logging_dir="./logs",
