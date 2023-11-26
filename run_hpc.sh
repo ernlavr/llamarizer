@@ -15,5 +15,8 @@ conda init
 conda activate /home/$USER/.conda/envs/hackathon
 
 echo "Starting python"
-python3 main.py
+#python3 main.py --args_path conf/args.yaml
+
+# sweep
+wandb agent ernlavr/adv_nlp2023/gesr25n8
 echo "Done ./run_hpc.sh"

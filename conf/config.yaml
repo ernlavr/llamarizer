@@ -5,14 +5,23 @@
 program: main.py
 method: grid # grid, bayes, random
 parameters:
-  wandb_mode :
-    values : ["offline"]
-  learning_rate:
+  use_prompt:
     values:
-      - 0.001
-      - 0.0001
-  optimizer:
-    values: ["adam"]
+      - True
+      - False
+  sequence_length:
+    values:
+      - 512
+      - 768
+  train_size:
+    values: 
+      - 8000
+  val_size:
+    values:
+      - 800
+  epochs:
+    values:
+      - 5
 metric:
   name: validation_loss # https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
   goal: minimize
