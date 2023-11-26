@@ -106,62 +106,21 @@ class Summarizer(bs.BaseModel):
             text,
             return_tensors="pt",
         )
-    
-    def collate_fn_padding(self, batch):
-        # Get the maximum sequence length in the batch
-        max_len = max([x["input_ids"].shape[1] for x in batch])
-
-        # Pad input_ids and attention_mask
-        padded_input_list = []
-        padded_attention_mask = []
-        padded_labels = []
-
-        for x in batch:
-            # Pad input_ids
-            pad_length = max_len - x["input_ids"].shape[1]
-
-            input_ids_detached = x["input_ids"].detach().cpu().numpy().squeeze()
-            input_ids_padded = np.concatenate((input_ids_detached, [self.tokenizer.pad_token_id] * pad_length))
-            padded_input_list.append(input_ids_padded)
-
-            # Pad attention_mask
-            mask_detached = x["attention_mask"].detach().cpu().numpy().squeeze()
-            mask_padded = np.concatenate((mask_detached, [0] * pad_length))
-            padded_attention_mask.append(mask_padded)
-
-            # Pad labels
-            pad_length = max_len - x["labels"].shape[1]
-            labels_detached = x["labels"].detach().cpu().numpy().squeeze()
-            labels_padded = np.concatenate((labels_detached, [self.tokenizer.pad_token_id] * pad_length))
-            padded_labels.append(labels_padded)
-
-        input_ids = torch.tensor(padded_input_list, dtype=torch.long)
-        attention_mask = torch.tensor(padded_attention_mask, dtype=torch.long)
-        labels = torch.tensor(padded_labels, dtype=torch.long)
-
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels,
-        }
-
 
     def collate_fn(self, batch):
         # pad the input_ids and attention_mask to the longest sequence in the batch
-        max_seq = max([x["input_ids"].shape[1] for x in batch])
+        inputs = [x["input_ids"] for x in batch]
+        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='longest')
+        inputs_length = inputs_tokenized.data["input_ids"].shape[1]
         
-        input_ids = torch.vstack([torch.tensor(x["input_ids"]) for x in batch])
-        attention_mask = torch.vstack([torch.tensor(x["attention_mask"]) for x in batch])
-        labels = torch.vstack([torch.tensor(x["labels"]) for x in batch])
+        labels = [x["labels"] for x in batch]
+        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=inputs_length)
 
-        # pad
-        input_ids = torch.nn.functional.pad(input_ids, (0, max_seq - input_ids.shape[1]), value=self.tokenizer.pad_token_id)
-        attention_mask = torch.nn.functional.pad(attention_mask, (0, max_seq - attention_mask.shape[1]), value=0)
-        labels = torch.nn.functional.pad(labels, (0, max_seq - labels.shape[1]), value=self.tokenizer.pad_token_id)
+        
+        input_ids = inputs_tokenized.data["input_ids"]
+        attention_mask = inputs_tokenized.data["attention_mask"]
 
-        print(input_ids.shape)
-        print(attention_mask.shape)
-        print(labels.shape)
+        labels = labels_tokenized.data["input_ids"]
 
         return {
             "input_ids": input_ids,
@@ -203,7 +162,7 @@ class Summarizer(bs.BaseModel):
             train_dataset=self.dataset.train_tokenized,
             eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
-            data_collator=self.collate_fn_padding,
+            data_collator=self.collate_fn,
             compute_metrics=self.compute_metrics,
         )
 
