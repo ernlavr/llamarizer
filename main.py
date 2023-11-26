@@ -9,7 +9,7 @@ from huggingface_hub.hf_api import HfFolder
 
 
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 
 def setupEnvVariables(args):

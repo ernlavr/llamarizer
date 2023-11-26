@@ -9,8 +9,16 @@ from peft import (
 import transformers
 import src.ml.baseModel as bs
 import src.datasets.xSum as xSum
+import src.utils.EvalTrainer as et
 import evaluate
 import numpy as np
+
+
+from transformers.utils import logging
+
+
+logging.set_verbosity_debug()
+logger = logging.get_logger("transformers")
 
 
 class Summarizer(bs.BaseModel):
@@ -32,13 +40,15 @@ class Summarizer(bs.BaseModel):
 
         # Tokenizer
         print("Loading tokenizer")
-        self.tokenizer = transformers.LlamaTokenizer.from_pretrained(self.model_name)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Dataset
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenize)
+         # 0.5 epoch
+        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.batch_size / 2)
 
         # Model
         print("Loading model")
@@ -89,9 +99,6 @@ class Summarizer(bs.BaseModel):
         # take softmax over logits
         predictions = np.argmax(predictions, axis=-1)
 
-        print([(min(l), max(l)) for l in labels])
-        print([(min(l), max(l)) for l in predictions])
-
         predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
         labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
         
@@ -113,10 +120,11 @@ class Summarizer(bs.BaseModel):
     def collate_fn(self, batch):
         # pad the input_ids and attention_mask to the longest sequence in the batch
         inputs = [x["input_ids"] for x in batch]
-        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='max_length', max_length=self.sequence_length, truncation=True)
+        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='longest')
+        inputs_length = inputs_tokenized.data["input_ids"].shape[1]
         
         labels = [x["labels"] for x in batch]
-        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=self.sequence_length, truncation=True)
+        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=inputs_length)
 
         
         input_ids = inputs_tokenized.data["input_ids"]
@@ -139,10 +147,10 @@ class Summarizer(bs.BaseModel):
             logging_dir="./logs",
             logging_steps=10,
             do_eval=True,
-            evaluation_strategy="epoch",
-            save_strategy="epoch",
+            evaluation_strategy="steps",
+            save_strategy="steps",
             save_steps=1000,
-            eval_steps=100,
+            eval_steps=25,
 
             # hyperparameters
             learning_rate=self.learning_rate,
@@ -152,8 +160,9 @@ class Summarizer(bs.BaseModel):
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
-            warmup_steps=500,
+            warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
+            eval_accumulation_steps=1,
             
             # huggingface
             push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
@@ -166,14 +175,13 @@ class Summarizer(bs.BaseModel):
             optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw"
         )
 
-        trainer = transformers.Trainer(
+        trainer = et.CustomTrainer(
             model=self.model,
             args=training_args,
             train_dataset=self.dataset.train_tokenized,
             eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
             data_collator=self.collate_fn,
-            compute_metrics=self.compute_metrics,
         )
 
         trainer.train()

@@ -9,19 +9,15 @@ parameters:
     values:
       - True
       - False
-  sequence_length:
-    values:
-      - 512
-      - 768
   train_size:
     values: 
-      - 8000
+      - 40000
   val_size:
     values:
-      - 800
+      - 4000
   epochs:
     values:
-      - 5
+      - 2
 metric:
   name: validation_loss # https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
   goal: minimize

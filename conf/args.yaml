@@ -10,9 +10,9 @@ sequence_length : 512
 model_name : "meta-llama/Llama-2-7b-hf"
 
 # dataset
-train_size: 8000
-val_size: 800
-use_prompt: True
+train_size: 20000
+val_size: 1000
+use_prompt: False
 
 # Quantization (necessary for Llama2)
 load_in_4bit: True
