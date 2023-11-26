@@ -9,8 +9,16 @@ from peft import (
 import transformers
 import src.ml.baseModel as bs
 import src.datasets.xSum as xSum
+import src.utils.EvalTrainer as et
 import evaluate
 import numpy as np
+
+
+from transformers.utils import logging
+
+
+logging.set_verbosity_debug()
+logger = logging.get_logger("transformers")
 
 
 class Summarizer(bs.BaseModel):
@@ -133,37 +141,44 @@ class Summarizer(bs.BaseModel):
         training_args = transformers.TrainingArguments(
             report_to="wandb",
             output_dir="./results",
+            logging_dir="./logs",
+            logging_steps=10,
+            do_eval=True,
+            evaluation_strategy="steps",
+            save_strategy="steps",
+            save_steps=1000,
+            eval_steps=25,
+
+            # hyperparameters
             learning_rate=self.learning_rate,
             warmup_ratio=0.1,
             max_grad_norm=0.3,
             weight_decay=self.weight_decay,
-            load_best_model_at_end=True,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
             warmup_steps=500,
-            logging_dir="./logs",
-            logging_steps=10,
-            do_eval=True,
             metric_for_best_model="eval_loss",
-            push_to_hub_model_id=self.model_name + "4bit-xsum",
-            evaluation_strategy="steps",
-            save_strategy="steps",
-            save_steps=1000,
-            fp16=True,
-            gradient_checkpointing=True,        
-            optim = "paged_adamw_32bit",
-            hub_token="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"
+            eval_accumulation_steps=1,
+            
+            # huggingface
+            push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
+            hub_token="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",
+            load_best_model_at_end=True,
+
+            # model quantization stuff
+            fp16=wandb.config.load_in_4bit,
+            gradient_checkpointing=wandb.config.load_in_4bit,        
+            optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw"
         )
 
-        trainer = transformers.Trainer(
+        trainer = et.CustomTrainer(
             model=self.model,
             args=training_args,
             train_dataset=self.dataset.train_tokenized,
             eval_dataset=self.dataset.val_tokenized,
             tokenizer=self.tokenizer,
             data_collator=self.collate_fn,
-            compute_metrics=self.compute_metrics,
         )
 
         trainer.train()

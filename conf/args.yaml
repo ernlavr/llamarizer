@@ -3,16 +3,16 @@ wandb_mode : "online"
 
 # Hyperparameters
 learning_rate: 1e-4
-epochs: 2
+epochs: 10
 weight_decay : 0.01
 batch_size : 8
 sequence_length : 512
 model_name : "distilgpt2"
 
 # dataset
-train_size: 16
-val_size: 4
-use_prompt: True
+train_size: 4000
+val_size: 400
+use_prompt: False
 
 # Quantization (necessary for Llama2)
 load_in_4bit: False
