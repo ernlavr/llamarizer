@@ -28,7 +28,7 @@ class CustomTrainer(transformers.Trainer):
         rouge = self.rouge.compute(predictions=predictions, references=labels)
         return rouge
 
-    @torch.no_grad()
+
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         self.model.eval()
@@ -37,20 +37,21 @@ class CustomTrainer(transformers.Trainer):
         metrics = {}
 
         for inputs in eval_dataloader:
-            # get predictions
-            inputs = self._prepare_inputs(inputs)
-            loss, outputs = self.compute_loss(self.model, inputs, return_outputs=True)
-            total_loss += loss.item()
-            total_steps += 1
+            with torch.no_grad():
+                # get predictions
+                inputs = self._prepare_inputs(inputs)
+                loss, outputs = self.compute_loss(self.model, inputs, return_outputs=True)
+                total_loss += loss.item()
+                total_steps += 1
 
-            # Compute metrics and add to dict
-            outputs = torch.argmax(outputs.logits, dim=-1)
-            computed_metrics = self.cm(outputs, inputs["labels"])
-            for key, value in computed_metrics.items():
-                if key in metrics:
-                    metrics[key].append(value)
-                else:
-                    metrics[key] = [value]
+                # Compute metrics and add to dict
+                outputs = torch.argmax(outputs.logits, dim=-1)
+                computed_metrics = self.cm(outputs, inputs["labels"])
+                for key, value in computed_metrics.items():
+                    if key in metrics:
+                        metrics[key].append(value)
+                    else:
+                        metrics[key] = [value]
 
         # log each metrics to wandb
         for key, value in metrics.items():
