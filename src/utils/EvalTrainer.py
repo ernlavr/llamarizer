@@ -11,11 +11,24 @@ import src.ml.baseModel as bs
 import src.datasets.xSum as xSum
 import evaluate as eval
 import numpy as np
+import torch.nn.functional as F
 
 class CustomTrainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
+        self.generation_config = self.get_gen_config()
+
+    def get_gen_config(self):
+        config = transformers.GenerationConfig(
+            repetition_penalty=1.25,
+            pad_token_id=self.tokenizer.eos_token_id,
+            
+            # Output variables
+            output_scores=True,
+            return_dict_in_generate=True,
+        )
+        return config
 
     def cm(self, preds, labels):
         """ Eval_pred consists of a tuple of predictions and labels
@@ -43,6 +56,28 @@ class CustomTrainer(transformers.Trainer):
             text_table.add_data(epoch, loss, r1, r2, source_i, target_i, prediction_i)
         wandb.run.log({'Training_Samples' : text_table})
 
+    def compute_loss(self, model, inputs, evaluation=False):
+        """
+        Compute cross-entropy loss using PyTorch.
+
+        Parameters:
+        - predictions: Predicted probabilities (PyTorch tensor)
+        - targets: True labels (PyTorch tensor, one-hot encoded)
+
+        Returns:
+        - Cross-entropy loss
+        """
+        loss = super().compute_loss(model, inputs)
+        return loss
+    
+    def cross_entropy_loss(self, predictions, targets, pad_token_id):
+        """ Compute cross-entropy loss using PyTorch.
+            predictions: (batch_size, seq_len, vocab_size)
+            targets: (batch_size, seq_len)
+        """
+        # compute loss
+        loss = F.cross_entropy(predictions, targets, ignore_index=pad_token_id)
+        return loss
 
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
@@ -54,13 +89,29 @@ class CustomTrainer(transformers.Trainer):
         for inputs in eval_dataloader:
             with torch.no_grad():
                 # get predictions
+                output_length = inputs["labels"].shape[1] + inputs["input_ids"].shape[1]
                 inputs = self._prepare_inputs(inputs)
-                loss, outputs = self.compute_loss(self.model, inputs, return_outputs=True)
+                outputs = self.model.generate(**inputs, 
+                                              repetition_penalty=1.25, 
+                                              max_length=output_length, 
+                                              min_length=output_length,
+                                              output_scores=True, 
+                                              return_dict_in_generate=True)
+                
+                # TODO: Experiment with no min_length and pad predictions, or no max_length and pad labels!
+                
+                # Format the output. Convert to a tensor, flip to BxSxV, and argmax
+                outputs = torch.stack(outputs.scores)
+                outputs = outputs.permute(1, 0, 2)
+                outputs = torch.softmax(outputs, dim=-1)
+
+                # Compute loss 
+                loss = self.cross_entropy_loss(outputs.view(-1, self.model.config.vocab_size), inputs["labels"].view(-1), self.tokenizer.pad_token_id)
                 total_loss += loss.item()
                 total_steps += 1
 
                 # Compute metrics and add to dict
-                outputs = torch.argmax(outputs.logits, dim=-1)
+                outputs = torch.argmax(outputs, dim=-1)
                 computed_metrics = self.cm(outputs, inputs["labels"])
                 for key, value in computed_metrics.items():
                     if key in metrics:
@@ -76,6 +127,7 @@ class CustomTrainer(transformers.Trainer):
 
         # finish up
         avg_loss = total_loss / total_steps
+        print(avg_loss)
         self.model.train()
         wandb.log({"eval_loss": avg_loss})
         self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], inputs["input_ids"], outputs, inputs["labels"])
