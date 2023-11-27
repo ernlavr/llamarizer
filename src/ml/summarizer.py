@@ -1,21 +1,19 @@
+import evaluate
+import numpy as np
 import torch
+import transformers
 import wandb
 from peft import (
     LoraConfig,
     TaskType,
-    prepare_model_for_kbit_training,
     get_peft_model,
+    prepare_model_for_kbit_training,
 )
-import transformers
-import src.ml.baseModel as bs
-import src.datasets.xSum as xSum
-import src.utils.EvalTrainer as et
-import evaluate
-import numpy as np
-
-
 from transformers.utils import logging
 
+import src.datasets.xSum as xSum
+import src.ml.baseModel as bs
+import src.utils.EvalTrainer as et
 
 logging.set_verbosity_debug()
 logger = logging.get_logger("transformers")
@@ -36,7 +34,7 @@ class Summarizer(bs.BaseModel):
         self.load_in_4bit = wandb.config.load_in_4bit
 
         # metrics
-        self.rouge = evaluate.load('rouge')
+        self.rouge = evaluate.load("rouge")
 
         # Tokenizer
         print("Loading tokenizer")
@@ -47,8 +45,10 @@ class Summarizer(bs.BaseModel):
         # Dataset
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenize)
-         # 0.5 epoch
-        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.batch_size / 2)
+        # 0.5 epoch
+        self.warm_up_steps = int(
+            len(self.dataset.train_tokenized) / self.batch_size / 2
+        )
 
         # Model
         print("Loading model")
@@ -68,7 +68,6 @@ class Summarizer(bs.BaseModel):
         self.model = self.get_model()
         if not self.model.config.pad_token_id:
             self.model.config.pad_token_id = self.model.config.eos_token_id
-        
 
     def get_model(self):
         model = None
@@ -79,20 +78,21 @@ class Summarizer(bs.BaseModel):
             model = prepare_model_for_kbit_training(model)
             model = get_peft_model(model, self.peft_config)
         else:
-            model = transformers.AutoModelForCausalLM.from_pretrained(
-                self.model_name
-            )
+            model = transformers.AutoModelForCausalLM.from_pretrained(self.model_name)
 
         return model
 
     def compute_metrics(self, eval_pred):
-        """ Eval_pred consists of a tuple of predictions and labels
-            predictions (1, 1, 1024, 50257)
-            labels (1, 1, 1024)
+        """Eval_pred consists of a tuple of predictions and labels
+        predictions (1, 1, 1024, 50257)
+        labels (1, 1, 1024)
         """
         # if eval_pred is torch, make it numpy
         if isinstance(eval_pred[0], torch.Tensor):
-            eval_pred = [(x[1].detach().cpu().numpy(), x[1].detach().cpu().numpy()) for x in eval_pred]
+            eval_pred = [
+                (x[1].detach().cpu().numpy(), x[1].detach().cpu().numpy())
+                for x in eval_pred
+            ]
 
         # compute ROUGE
         predictions, labels = np.squeeze(eval_pred[0]), np.squeeze(eval_pred[1])
@@ -101,15 +101,14 @@ class Summarizer(bs.BaseModel):
 
         predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
         labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
-        
+
         rouge = self.rouge.compute(predictions=predictions, references=labels)
         wandb.log({"rouge1": rouge["rouge1"]})
         wandb.log({"rouge2": rouge["rouge2"]})
         wandb.log({"rougeL": rouge["rougeL"]})
         wandb.log({"rougeLsum": rouge["rougeLsum"]})
 
-
-        return {'rouge': rouge}
+        return {"rouge": rouge}
 
     def tokenize(self, text):
         return self.tokenizer(
@@ -120,13 +119,16 @@ class Summarizer(bs.BaseModel):
     def collate_fn(self, batch):
         # pad the input_ids and attention_mask to the longest sequence in the batch
         inputs = [x["input_ids"] for x in batch]
-        inputs_tokenized = self.tokenizer(inputs, return_tensors='pt', padding='longest')
+        inputs_tokenized = self.tokenizer(
+            inputs, return_tensors="pt", padding="longest"
+        )
         inputs_length = inputs_tokenized.data["input_ids"].shape[1]
-        
-        labels = [x["labels"] for x in batch]
-        labels_tokenized = self.tokenizer(labels, return_tensors='pt', padding='max_length', max_length=inputs_length)
 
-        
+        labels = [x["labels"] for x in batch]
+        labels_tokenized = self.tokenizer(
+            labels, return_tensors="pt", padding="max_length", max_length=inputs_length
+        )
+
         input_ids = inputs_tokenized.data["input_ids"]
         attention_mask = inputs_tokenized.data["attention_mask"]
 
@@ -151,7 +153,6 @@ class Summarizer(bs.BaseModel):
             save_strategy="steps",
             save_steps=1000,
             eval_steps=25,
-
             # hyperparameters
             learning_rate=self.learning_rate,
             warmup_ratio=0.1,
@@ -163,16 +164,14 @@ class Summarizer(bs.BaseModel):
             warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
             eval_accumulation_steps=1,
-            
             # huggingface
             push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
             hub_token="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",
             load_best_model_at_end=True,
-
             # model quantization stuff
             fp16=wandb.config.load_in_4bit,
-            gradient_checkpointing=wandb.config.load_in_4bit,        
-            optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw"
+            gradient_checkpointing=wandb.config.load_in_4bit,
+            optim="paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw",
         )
 
         trainer = et.CustomTrainer(
