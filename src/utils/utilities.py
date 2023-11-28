@@ -24,6 +24,7 @@ def getArgs():
     parser.add_argument(
         "--load_in_4bit", action="store_true", help="Load in 4bit weights", default=False
     )
+    parser.add_argument("--repetition_penalty", type=float, default=1.25, help="Repetition penalty")
 
     # dataset hyperparameters
     parser.add_argument("--train_size", type=int, default=100, help="Number of datapoints in training set")

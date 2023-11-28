@@ -18,6 +18,7 @@ class CustomTrainer(transformers.Trainer):
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
         self.generation_config = self.get_gen_config()
+        self.repetition_penalty = wandb.config.repetition_penalty
 
     def get_gen_config(self):
         config = transformers.GenerationConfig(
@@ -48,7 +49,12 @@ class CustomTrainer(transformers.Trainer):
         r1 = np.mean(r1)
         r2 = np.mean(r2)
         text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
-        for i in range(2):
+        
+        num_examples = 4
+        if prediction.shape[0] < 4:
+            num_examples = prediction.shape[0]
+
+        for i in range(num_examples):
             source_i = self.tokenizer.decode(source[i])
             target_i = self.tokenizer.decode(target[i])
             prediction_i = self.tokenizer.decode(prediction[i])
@@ -100,7 +106,7 @@ class CustomTrainer(transformers.Trainer):
 
                     inputs_i = self._prepare_inputs(inputs_i)
                     predictions = self.model.generate(**inputs_i, 
-                                                    repetition_penalty=1.25, 
+                                                    repetition_penalty=self.repetition_penalty, 
                                                     max_length=output_length, # length output equal to target
                                                     min_length=output_length, # to avoid padding issues
                                                     output_scores=True, 
