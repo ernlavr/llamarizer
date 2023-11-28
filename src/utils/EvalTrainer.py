@@ -86,33 +86,43 @@ class CustomTrainer(transformers.Trainer):
         total_steps = 0
         metrics = {}
 
+        # TODO: Experiment with no min_length and pad predictions, or no max_length and pad labels!
         for inputs in eval_dataloader:
             with torch.no_grad():
-                # get predictions
-                output_length = inputs["labels"].shape[1] + inputs["input_ids"].shape[1]
-                inputs = self._prepare_inputs(inputs)
-                outputs = self.model.generate(**inputs, 
-                                              repetition_penalty=1.25, 
-                                              max_length=output_length, 
-                                              min_length=output_length,
-                                              output_scores=True, 
-                                              return_dict_in_generate=True)
-                
-                # TODO: Experiment with no min_length and pad predictions, or no max_length and pad labels!
-                
-                # Format the output. Convert to a tensor, flip to BxSxV, and argmax
-                outputs = torch.stack(outputs.scores)
-                outputs = outputs.permute(1, 0, 2)
-                outputs = torch.softmax(outputs, dim=-1)
+                # loop over each example in batch inputs["input_ids"] one by one and generate loss
+                outputs = torch.zeros(inputs["input_ids"].shape[0], inputs["input_ids"].shape[1], dtype=torch.int).to(self.model.device)
 
-                # Compute loss 
-                loss = self.cross_entropy_loss(outputs.view(-1, self.model.config.vocab_size), inputs["labels"].view(-1), self.tokenizer.pad_token_id)
-                total_loss += loss.item()
-                total_steps += 1
+                # Generate and process examples one by one to save memory ;_; (peasant solution)
+                for i in range(inputs["input_ids"].shape[0]):
+                    # get the output length
+                    output_length = inputs["labels"].shape[1] + inputs["input_ids"].shape[1]
+                    inputs_i = {key: value[i].unsqueeze(0) for key, value in inputs.items()}
 
-                # Compute metrics and add to dict
-                outputs = torch.argmax(outputs, dim=-1)
-                computed_metrics = self.cm(outputs, inputs["labels"])
+                    inputs_i = self._prepare_inputs(inputs_i)
+                    predictions = self.model.generate(**inputs_i, 
+                                                    repetition_penalty=1.25, 
+                                                    max_length=output_length, # length output equal to target
+                                                    min_length=output_length, # to avoid padding issues
+                                                    output_scores=True, 
+                                                    return_dict_in_generate=True)
+                    
+                    # Format the output. Convert to a tensor, flip to BxSxV, and argmax
+                    predictions = torch.stack(predictions.scores)
+                    predictions = predictions.permute(1, 0, 2)
+                    predictions = torch.softmax(predictions, dim=-1)
+                    predictions = predictions.view(-1, self.model.config.vocab_size)
+                    labels = inputs_i["labels"].view(-1)
+
+                    # Compute loss 
+                    loss = self.cross_entropy_loss(predictions, labels, self.tokenizer.pad_token_id)
+                    total_loss += loss.item()
+                    total_steps += 1
+
+                    # as a last step, replace inputs["input_ids"] with the generated output. Very careful with bugs here!!
+                    outputs[i] = torch.argmax(predictions, dim=-1)
+
+                # Compute metrics for the whole batch
+                computed_metrics = self.cm(inputs["input_ids"], inputs["labels"])
                 for key, value in computed_metrics.items():
                     if key in metrics:
                         metrics[key].append(value)
