@@ -42,7 +42,8 @@ class Summarizer(bs.BaseModel):
         print("Loading tokenizer")
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+            #self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.add_special_tokens({"pad_token": "<PAD>"})
 
         # Dataset
         print("Loading dataset")
@@ -67,7 +68,8 @@ class Summarizer(bs.BaseModel):
         )
         self.model = self.get_model()
         if not self.model.config.pad_token_id:
-            self.model.config.pad_token_id = self.model.config.eos_token_id
+            #self.model.config.pad_token_id = self.model.config.eos_token_id
+            self.model.resize_token_embeddings(self.model.config.vocab_size + 1)
         
 
     def get_model(self):
