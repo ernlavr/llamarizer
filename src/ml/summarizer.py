@@ -40,7 +40,7 @@ class Summarizer(bs.BaseModel):
 
         # Tokenizer
         print("Loading tokenizer")
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name, padding_side="left")
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -150,7 +150,7 @@ class Summarizer(bs.BaseModel):
             evaluation_strategy="steps",
             save_strategy="steps",
             save_steps=1000,
-            eval_steps=2,
+            eval_steps=25,
 
             # hyperparameters
             learning_rate=self.learning_rate,
@@ -159,7 +159,7 @@ class Summarizer(bs.BaseModel):
             weight_decay=self.weight_decay,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
-            per_device_eval_batch_size=self.batch_size,
+            per_device_eval_batch_size=1,
             warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
             eval_accumulation_steps=1,
@@ -172,7 +172,7 @@ class Summarizer(bs.BaseModel):
             # model quantization stuff
             fp16=wandb.config.load_in_4bit,
             gradient_checkpointing=wandb.config.load_in_4bit,        
-            optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw_torch"
+            optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw"
         )
 
         trainer = et.CustomTrainer(
