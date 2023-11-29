@@ -30,9 +30,11 @@ def getArgs():
     parser.add_argument("--train_size", type=int, default=100, help="Number of datapoints in training set")
     parser.add_argument("--val_size", type=int, default=10, help="Number of datapoints in validation set")
 
+
     # other stuff
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
     parser.add_argument("--use_prompt", type=bool, default=False, help="Wraps input text with a prompt")
+    parser.add_argument("--additional_info", type=str, default=None, help="Prompt to use")
 
     # check if we have a config file
     args = parser.parse_args()

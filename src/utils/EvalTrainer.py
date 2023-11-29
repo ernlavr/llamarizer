@@ -42,7 +42,9 @@ class CustomTrainer(transformers.Trainer):
         rouge = self.rouge.compute(predictions=predictions, references=labels)
         return rouge
 
+
     def push_artifacts_table(self, epoch, loss, r1, r2, document, target, prediction):
+
         """ Returns a wandb.Table object containing all the artifacts
             in the run
         """
