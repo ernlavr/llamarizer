@@ -35,7 +35,12 @@ class CustomTrainer(transformers.Trainer):
         r1 = np.mean(r1)
         r2 = np.mean(r2)
         text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
-        for i in range(2):
+
+        num_examples = 4
+        if prediction.shape[0] < 4:
+            num_examples = prediction.shape[0]
+
+        for i in range(num_examples):
             source_i = self.tokenizer.decode(source[i])
             target_i = self.tokenizer.decode(target[i])
             prediction_i = self.tokenizer.decode(prediction[i])
