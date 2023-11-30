@@ -42,8 +42,8 @@ class Summarizer(bs.BaseModel):
         print("Loading tokenizer")
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         if not self.tokenizer.pad_token:
-            #self.tokenizer.pad_token = self.tokenizer.eos_token
-            self.tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            #self.tokenizer.add_special_tokens({"pad_token": "<PAD>"})
 
         # Dataset
         print("Loading dataset")
@@ -68,8 +68,8 @@ class Summarizer(bs.BaseModel):
         )
         self.model = self.get_model()
         if not self.model.config.pad_token_id:
-            #self.model.config.pad_token_id = self.model.config.eos_token_id
-            self.model.resize_token_embeddings(self.model.config.vocab_size + 1)
+            self.model.config.pad_token_id = self.model.config.eos_token_id
+            #self.model.resize_token_embeddings(self.model.config.vocab_size + 1)
         
 
     def get_model(self):
@@ -152,7 +152,7 @@ class Summarizer(bs.BaseModel):
             evaluation_strategy="steps",
             save_strategy="steps",
             save_steps=1000,
-            eval_steps=2,
+            eval_steps=25,
 
             # hyperparameters
             learning_rate=self.learning_rate,

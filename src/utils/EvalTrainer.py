@@ -43,7 +43,7 @@ class CustomTrainer(transformers.Trainer):
         return rouge
 
 
-    def push_artifacts_table(self, epoch, loss, r1, r2, document, target, prediction):
+    def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
 
         """ Returns a wandb.Table object containing all the artifacts
             in the run
@@ -53,17 +53,19 @@ class CustomTrainer(transformers.Trainer):
         text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
 
         num_examples = 4
-        if prediction.shape[0] < 4:
-            num_examples = prediction.shape[0]
+        if len(predictions["document"]) < num_examples:
+            num_examples = len(predictions["document"])
 
         for i in range(num_examples):
-            document_i = self.tokenizer.decode(document[i])
-            target_i = self.tokenizer.decode(target[i])
-            prediction_i = self.tokenizer.decode(prediction[i])
+            document_i = predictions['document'][i]
+            target_i = predictions['target'][i]
+            prediction_i = predictions['prediction'][i]
 
             text_table.add_data(epoch, loss, r1, r2, document_i, target_i, prediction_i)
         wandb.run.log({'Training_Samples' : text_table})
 
+    def decode_example(self, example, skip_special_tokens=False):
+        return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
 
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
@@ -71,7 +73,8 @@ class CustomTrainer(transformers.Trainer):
         metrics = {}
 
         # Following loop assumes evaluation batch size 1!
-        predictions = []
+        predictions = {"document" : [], "target" : [], "prediction" : []}
+        prediction_count = 0
         for inputs in eval_dataloader:
             with torch.no_grad():
                 
@@ -97,7 +100,14 @@ class CustomTrainer(transformers.Trainer):
                     prediction = torch.stack(prediction.scores)
                     prediction = prediction.permute(1, 0, 2)
                     prediction = torch.argmax(prediction, dim=-1)
-                    labels = inputs_i["labels"]                 
+                    labels = inputs_i["labels"]       
+
+                    # save the predictions
+                    if prediction_count >= 5:
+                        prediction_count += 1
+                        predictions["document"].append(self.decode_example(inputs_i["input_ids"].squeeze()))
+                        predictions["target"].append(self.decode_example(inputs_i["labels"].squeeze()))
+                        predictions["prediction"].append(self.decode_example(prediction.squeeze()))
 
                     # Compute metrics for the whole batch
                     computed_metrics = self.cm(prediction, labels)
@@ -118,5 +128,5 @@ class CustomTrainer(transformers.Trainer):
         print(avg_loss)
         self.model.train()
         wandb.log({"eval_loss": avg_loss})
-        self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], inputs["input_ids"], inputs["labels"], prediction)
+        self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], predictions)
         return {"eval_loss": avg_loss}
