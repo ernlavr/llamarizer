@@ -162,6 +162,17 @@ class Summarizer(bs.BaseModel):
             "labels": labels,
         }
 
+    def save_model(self, trainer):
+        # save the checkpoints of best performing model
+        run_id = wandb.run.id
+        trainer.save_model(f"./results/best_model_{run_id}")
+
+        # upload the best model weights to wandb
+        artifact = wandb.Artifact(f'model_{run_id}', type='model')
+        artifact.add_dir(f"./results/best_model_{run_id}")
+        wandb.run.log_artifact(artifact)
+        artifact.wait() # wait for artifact to finish uploading
+
     def train(self):
         # Prepare the model for training
         training_args = transformers.TrainingArguments(
@@ -183,7 +194,7 @@ class Summarizer(bs.BaseModel):
             weight_decay=self.weight_decay,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
-            per_device_eval_batch_size=2,
+            per_device_eval_batch_size=self.batch_size,
             warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
             eval_accumulation_steps=8,
@@ -212,19 +223,8 @@ class Summarizer(bs.BaseModel):
 
         trainer.train()
         
-        # save the checkpoints of best performing model
-        run_id = wandb.run.id
-        trainer.save_model(f"./results/best_model_{run_id}")
-
-        # upload the best model weights to wandb
-        artifact = wandb.Artifact(f'model_{run_id}', type='model')
-        artifact.add_dir(f"./results/best_model_{run_id}")
-        
-
-        # wandb get run
-        wandb.run.log_artifact(artifact)
-        artifact.wait()
-        pass
+        if wandb.config.save_model_at_end:
+            self.save_model(trainer)
 
     def predict(self, X):
         pass

@@ -35,6 +35,7 @@ def getArgs():
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
     parser.add_argument("--use_prompt", type=bool, default=False, help="Wraps input text with a prompt")
     parser.add_argument("--additional_info", type=str, default=None, help="Prompt to use")
+    parser.add_argument("--save_model_at_end", type=bool, default=False, help="Save model at end of training")
 
     # check if we have a config file
     args = parser.parse_args()

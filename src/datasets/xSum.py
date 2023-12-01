@@ -16,7 +16,6 @@ class XSum:
         # self.train_tokenized = self.preprocess(train)
         # self.val_tokenized = self.preprocess(val)
         self.prompt = (f"Summarize this article: '{{dialog}}'; Summary:")
-        self.skipped_counter = 0
         train_set = train.map(self.apply_prompt_template)
         self.train_tokenized = self.preprocess(train_set)
 
@@ -58,13 +57,14 @@ class XSum:
     def preprocess(self, dataset):
         tokenizer = self.tokenizer
         output = []
+        skipped_counter = 0
         for examples in dataset:
             prompt = tokenizer.encode(tokenizer.bos_token + examples["document"], add_special_tokens=False)
             summary = tokenizer.encode(examples["summary"] + tokenizer.eos_token, add_special_tokens=False)
 
             # Skip examples that are too long. This will create empty examples that need to be removed later
             if len(prompt) > wandb.config.sequence_length:
-                self.skipped_counter += 1
+                skipped_counter += 1
                 continue
         
             sample = {
@@ -73,5 +73,5 @@ class XSum:
                 "labels": np.array([-100] * len(prompt) + summary)
             }
             output.append(sample)
-        print(f"Skipped {self.skipped_counter} examples")
+        print(f"Skipped {skipped_counter} examples")
         return output
