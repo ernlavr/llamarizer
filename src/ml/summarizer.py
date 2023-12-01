@@ -33,7 +33,9 @@ class Summarizer(bs.BaseModel):
         self.learning_rate = wandb.config.learning_rate
         self.weight_decay = wandb.config.weight_decay
         self.epochs = wandb.config.epochs
-        self.batch_size = wandb.config.batch_size
+        self.train_batch_size = wandb.config.batch_size
+        self.eval_batch_size = wandb.config.eval_batch_size
+        self.eval_steps = wandb.config.eval_steps
         self.sequence_length = wandb.config.sequence_length
         self.load_in_4bit = wandb.config.load_in_4bit
         self.wandb_run = run
@@ -183,7 +185,7 @@ class Summarizer(bs.BaseModel):
             logging_steps=10,
             do_eval=True,
             evaluation_strategy="steps",
-            eval_steps=2,
+            eval_steps=self.eval_steps,
             dataloader_pin_memory=False,
             include_inputs_for_metrics=True,
 
@@ -193,8 +195,8 @@ class Summarizer(bs.BaseModel):
             max_grad_norm=0.3,
             weight_decay=self.weight_decay,
             num_train_epochs=self.epochs,
-            per_device_train_batch_size=self.batch_size,
-            per_device_eval_batch_size=self.batch_size,
+            per_device_train_batch_size=self.train_batch_size,
+            per_device_eval_batch_size=self.eval_batch_size,
             warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
             eval_accumulation_steps=8,

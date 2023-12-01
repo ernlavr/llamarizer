@@ -16,6 +16,7 @@ def getArgs():
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay")
     parser.add_argument("--epochs", type=int, default=5, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=24, help="Batch size")
+    parser.add_argument("--eval_batch_size", type=int, default=2, help="Batch size")
     parser.add_argument(
         "--sequence_length", type=int, default=512, help="Sequence length"
     )
@@ -25,6 +26,7 @@ def getArgs():
         "--load_in_4bit", action="store_true", help="Load in 4bit weights", default=False
     )
     parser.add_argument("--repetition_penalty", type=float, default=1.25, help="Repetition penalty")
+    parser.add_argument("--eval_steps", type=int, default=2, help="Eval steps")
 
     # dataset hyperparameters
     parser.add_argument("--train_size", type=int, default=100, help="Number of datapoints in training set")
@@ -32,6 +34,7 @@ def getArgs():
 
 
     # other stuff
+    parser.add_argument("--num_examples", type=int, default=4, help="Number of examples to log")
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
     parser.add_argument("--use_prompt", type=bool, default=False, help="Wraps input text with a prompt")
     parser.add_argument("--additional_info", type=str, default=None, help="Prompt to use")

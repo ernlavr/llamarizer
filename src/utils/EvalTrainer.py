@@ -19,6 +19,7 @@ class CustomTrainer(transformers.Trainer):
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
         self.repetition_penalty = wandb.config.repetition_penalty
+        self.num_examples = wandb.config.num_examples
 
 
     def cm(self, preds, labels):
@@ -42,7 +43,7 @@ class CustomTrainer(transformers.Trainer):
         r2 = np.mean(r2)
         text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
 
-        num_examples = 4
+        num_examples = self.num_examples
         if len(predictions["document"]) < num_examples:
             num_examples = len(predictions["document"])
 
