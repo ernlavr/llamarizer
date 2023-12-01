@@ -46,10 +46,11 @@ class XSum:
         if len(prompt) > wandb.config.sequence_length:
             self.skipped_counter += 1
             return
-    
+
+        attention_mask = [1] * len(prompt) + [0] * len(summary)
         sample = {
             "input_ids": np.array(prompt + summary),
-            "attention_mask": np.array([1] * (len(prompt) + len(summary))),
+            "attention_mask": np.array(attention_mask),
             "labels": np.array([-100] * len(prompt) + summary)
         }
         return sample
