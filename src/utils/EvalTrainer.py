@@ -76,13 +76,18 @@ class CustomTrainer(transformers.Trainer):
                 total_loss += loss.item()
                 total_steps += 1
 
+                # Compute metrics and add to dict
+                outputs = torch.softmax(outputs.logits, dim=-1)
+                outputs = torch.argmax(outputs, dim=-1)
+
+                # replace every outputs index with eos_token_id where label is -100
+                outputs[inputs["labels"] == -100] = self.tokenizer.eos_token_id
+
                 # After loss computation, turn the label -100s to pad_token_id
                 # This is because we can't decode -100s but we need it for loss computation
                 labels = inputs["labels"]
                 labels[labels == -100] = self.tokenizer.eos_token_id
 
-                # Compute metrics and add to dict
-                outputs = torch.argmax(outputs.logits, dim=-1)
                 computed_metrics = self.cm(outputs, labels)
                 for key, value in computed_metrics.items():
                     if key in metrics:
