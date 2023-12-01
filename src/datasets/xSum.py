@@ -15,7 +15,7 @@ class XSum:
 
         # self.train_tokenized = self.preprocess(train)
         # self.val_tokenized = self.preprocess(val)
-        self.prompt = (f"Summarize this dialog: '{{dialog}}'; Summary:")
+        self.prompt = (f"Summarize this article: '{{dialog}}'; Summary:")
         self.skipped_counter = 0
         train_set = train.map(self.apply_prompt_template)
         self.train_tokenized = self.preprocess(train_set)
