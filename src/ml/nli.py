@@ -16,6 +16,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
+from datasets import Dataset, load_dataset
+from datasets.dataset_dict import DatasetDict
 from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import (
@@ -27,9 +29,6 @@ from transformers import (
 )
 from transformers.tokenization_utils_base import BatchEncoding
 from transformers.trainer_utils import EvalPrediction
-
-from datasets import Dataset, load_dataset
-from datasets.dataset_dict import DatasetDict
 
 # .env file contains the WANDB_API_KEY and WANDB_PROJECT
 load_dotenv()
@@ -184,12 +183,12 @@ class NLI_Finetune:
             # is_factual: Yes (1) or No (0)
             is_factual: List[int] = examples["is_factual"]  # 0, 1
 
-            # Tokenize all texts and align the labels with them.
             tokenized_inputs = self.tokenizer(
-                summary,
-                truncation=True,
+                text=document,  # First part of the input
+                text_pair=summary,  # Second part of the input
+                truncation="only_first",  # Truncate only the first part (document) if the combined input is too long
                 padding="max_length",
-                max_length=128,
+                max_length=512,  # Or any other max length that suits your model
             )
 
             tokenized_inputs["labels"] = is_factual
