@@ -13,6 +13,7 @@ import src.utils.EvalTrainer as et
 import src.utils.logging as logUtils
 import evaluate
 import numpy as np
+import os
 
 
 from transformers.utils import logging
@@ -23,7 +24,7 @@ logger = logging.get_logger("transformers")
 
 
 class Summarizer(bs.BaseModel):
-    def __init__(self):
+    def __init__(self, run):
         print(f"GPUs available: {torch.cuda.device_count()}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -35,6 +36,7 @@ class Summarizer(bs.BaseModel):
         self.batch_size = wandb.config.batch_size
         self.sequence_length = wandb.config.sequence_length
         self.load_in_4bit = wandb.config.load_in_4bit
+        self.wandb_run = run
 
         # metrics
         self.rouge = evaluate.load('rouge')
@@ -170,9 +172,7 @@ class Summarizer(bs.BaseModel):
             logging_steps=10,
             do_eval=True,
             evaluation_strategy="steps",
-            save_strategy="steps",
-            save_steps=1000,
-            eval_steps=25,
+            eval_steps=2,
             dataloader_pin_memory=False,
             include_inputs_for_metrics=True,
 
@@ -183,10 +183,10 @@ class Summarizer(bs.BaseModel):
             weight_decay=self.weight_decay,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.batch_size,
-            per_device_eval_batch_size=1,
+            per_device_eval_batch_size=2,
             warmup_steps=self.warm_up_steps,
             metric_for_best_model="eval_loss",
-            eval_accumulation_steps=1,
+            eval_accumulation_steps=8,
             
             # huggingface
             push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
@@ -211,7 +211,20 @@ class Summarizer(bs.BaseModel):
         )
 
         trainer.train()
-        trainer.push_to_hub()
+        
+        # save the checkpoints of best performing model
+        run_id = wandb.run.id
+        trainer.save_model(f"./results/best_model_{run_id}")
+
+        # upload the best model weights to wandb
+        artifact = wandb.Artifact(f'model_{run_id}', type='model')
+        artifact.add_dir(f"./results/best_model_{run_id}")
+        
+
+        # wandb get run
+        wandb.run.log_artifact(artifact)
+        artifact.wait()
+        pass
 
     def predict(self, X):
         pass
