@@ -12,24 +12,14 @@ import src.datasets.xSum as xSum
 import evaluate as eval
 import numpy as np
 import torch.nn.functional as F
+from tqdm import tqdm
 
 class CustomTrainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
-        self.generation_config = self.get_gen_config()
         self.repetition_penalty = wandb.config.repetition_penalty
 
-    def get_gen_config(self):
-        config = transformers.GenerationConfig(
-            repetition_penalty=1.25,
-            pad_token_id=self.tokenizer.eos_token_id,
-            
-            # Output variables
-            output_scores=True,
-            return_dict_in_generate=True,
-        )
-        return config
 
     def cm(self, preds, labels):
         """ Eval_pred consists of a tuple of predictions and labels
@@ -66,6 +56,7 @@ class CustomTrainer(transformers.Trainer):
 
     def decode_example(self, example, skip_special_tokens=False):
         return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
+    
 
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
@@ -75,13 +66,13 @@ class CustomTrainer(transformers.Trainer):
         # Following loop assumes evaluation batch size 1!
         predictions = {"document" : [], "target" : [], "prediction" : []}
         prediction_count = 0
-        for inputs in eval_dataloader:
+        for inputs in tqdm(eval_dataloader, "Running evaluation.."):
             with torch.no_grad():
                 
                 # Generate and process examples one by one to save memory ;_; (peasant solution)
                 for i in range(inputs["input_ids"].shape[0]):
                     # get label length without special tokens
-                    label_length = int(torch.sum(inputs["labels"][i] != self.tokenizer.pad_token_id))
+                    label_length = int(torch.sum(inputs["labels"][i] != -100))
                     
                     # get the output length
                     max_out_length = int(inputs["input_ids"].shape[1] + label_length * 2) # double label size
@@ -100,14 +91,17 @@ class CustomTrainer(transformers.Trainer):
                     prediction = torch.stack(prediction.scores)
                     prediction = prediction.permute(1, 0, 2)
                     prediction = torch.argmax(prediction, dim=-1)
-                    labels = inputs_i["labels"]       
+                    labels = inputs_i["labels"]
+
+                    # Our labels are -100 padded, for loss computation, but we can't decode -100 so we replace it with the pad token
+                    labels[labels == -100] = self.tokenizer.eos_token_id
 
                     # save the predictions
-                    if prediction_count >= 5:
+                    if prediction_count < 5:
                         prediction_count += 1
                         predictions["document"].append(self.decode_example(inputs_i["input_ids"].squeeze()))
-                        predictions["target"].append(self.decode_example(inputs_i["labels"].squeeze()))
-                        predictions["prediction"].append(self.decode_example(prediction.squeeze()))
+                        predictions["target"].append(self.decode_example(prediction.squeeze(), True))
+                        predictions["prediction"].append(self.decode_example(labels.squeeze(), True))
 
                     # Compute metrics for the whole batch
                     computed_metrics = self.cm(prediction, labels)
