@@ -31,8 +31,12 @@ class XSum:
                 dataset.remove(i)
 
     def apply_prompt_template(self, example):
+        document = example["document"]
+        if wandb.config.use_prompt:
+            document = self.prompt.format(dialog=example["document"])
+            
         return {
-            "document": self.prompt.format(dialog=example["document"]),
+            "document": document,
             "summary": example["summary"],
         }
 

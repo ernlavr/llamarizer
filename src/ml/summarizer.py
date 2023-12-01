@@ -54,7 +54,7 @@ class Summarizer(bs.BaseModel):
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenizer)
          # 0.5 epoch
-        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.batch_size / 2)
+        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.train_batch_size / 2)
 
         # Model
         print("Loading model")
