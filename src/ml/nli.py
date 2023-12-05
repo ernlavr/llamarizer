@@ -13,6 +13,7 @@ Developed on DistilBert, but can be changed to any model from huggingface:
 
 """
 import os
+import wandb
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
@@ -41,21 +42,42 @@ os.environ["WANDB_MODE"] = "offline"
 
 @dataclass
 class NLI_Finetune:
-    HF_MODEL_NAME: str = "distilbert-base-uncased"
-    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
-    dataset_factuality: DatasetDict = field(
-        default_factory=lambda: load_dataset("xsum_factuality")
-    )
-    dataset_xsum: DatasetDict = field(
-        default_factory=lambda: load_dataset(
-            "EdinburghNLP/xsum", split="train+validation+test"
-        )
-    )
-    merged_dataset: Dataset = None
-    dataset: DatasetDict = None
 
-    def __post_init__(self):
-        def merge_datasets():
+    def __init__(self):
+        # Hyper parameters
+        self.HF_MODEL_NAME: str = wandb.config.model_name
+        self.learning_rate: float = wandb.config.learning_rate
+        self.weight_decay: float = wandb.config.weight_decay
+        self.epochs: int = wandb.config.epochs
+        self.train_batch_size: int = wandb.config.batch_size
+        self.eval_steps = wandb.config.eval_steps
+        
+        # Tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_NAME)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self.HF_MODEL_NAME, num_labels=2
+        )
+        
+        # Datasets
+        self.dataset_factuality: DatasetDict = load_dataset("xsum_factuality")
+        self.dataset_xsum: DatasetDict = load_dataset("EdinburghNLP/xsum", split="train+validation+test")
+        
+        self.merged_dataset: Dataset = None
+        self.dataset: DatasetDict = None
+        self.post_init()
+ 
+    def post_init(self):
+        self.merge_datasets()
+
+        # The is_factual column has NULL value for some entries which have been replaced iwth -1. These are removed.
+        self.merged_dataset = self.merged_dataset.filter(
+            lambda example: example["is_factual"] != -1
+        )
+
+        # split into train and validation
+        self.split_dataset()
+
+    def merge_datasets(self):
             """Should merge the X-sum dataset with the X-sum factuality dataset based on the bbcid. The two datasets have
             different columns, so the merge should be done on the bbcid column.
 
@@ -145,54 +167,40 @@ class NLI_Finetune:
                     num_rows: 5597 })
             """
 
-        def split_dataset():
-            """Since the X-sum dataset only contains a train set, we split it into train and validation set.
-            Note that the texts are replicated three times and should be grouped by "bbcid
-            """
-            bbcids: Set[str] = set(self.merged_dataset["id"])
+    def split_dataset(self):
+        """Since the X-sum dataset only contains a train set, we split it into train and validation set.
+        Note that the texts are replicated three times and should be grouped by "bbcid
+        """
+        bbcids: Set[str] = set(self.merged_dataset["id"])
 
-            # split the bbcids into train and validation
-            train_bbcids = set(list(bbcids)[: int(len(bbcids) * 0.8)])
-            val_bbcids = bbcids - train_bbcids
+        # split the bbcids into train and validation
+        train_bbcids = set(list(bbcids)[: int(len(bbcids) * 0.8)])
+        val_bbcids = bbcids - train_bbcids
 
-            # filter the dataset
+        # filter the dataset
 
-            self.dataset = DatasetDict()
+        self.dataset = DatasetDict()
 
-            self.dataset["val"] = self.merged_dataset.filter(
-                lambda example: example["id"] in val_bbcids
-            )
-            self.dataset["train"] = self.merged_dataset.filter(
-                lambda example: example["id"] in train_bbcids
-            )
+        self.dataset["val"] = self.merged_dataset.filter(
+            lambda example: example["id"] in val_bbcids
+        )
+        self.dataset["train"] = self.merged_dataset.filter(
+            lambda example: example["id"] in train_bbcids
+        )
 
-            train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=True)
-            val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=False)
+        train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=True)
+        val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=False)
+        
+        # Rebuild the dataset dict
+        self.dataset['train'] = train_upsampled
+        self.dataset['val'] = val_downsampled
             
-            # Rebuild the dataset dict
-            self.dataset['train'] = train_upsampled
-            self.dataset['val'] = val_downsampled
-                
-            # make sure that there don't exist a bbcid in both train and val
-            train_bbcids = set(self.dataset["train"]["id"])
-            val_bbcids = set(self.dataset["val"]["id"])
-            assert (
-                len(train_bbcids.intersection(val_bbcids)) == 0
-            ), "The same id exists in both train and val"
-
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            self.HF_MODEL_NAME, num_labels=2
-        )
-
-        merge_datasets()
-
-        # The is_factual column has NULL value for some entries which have been replaced iwth -1. These are removed.
-        self.merged_dataset = self.merged_dataset.filter(
-            lambda example: example["is_factual"] != -1
-        )
-
-        # split into train and validation
-        split_dataset()
+        # make sure that there don't exist a bbcid in both train and val
+        train_bbcids = set(self.dataset["train"]["id"])
+        val_bbcids = set(self.dataset["val"]["id"])
+        assert (
+            len(train_bbcids.intersection(val_bbcids)) == 0
+        ), "The same id exists in both train and val"
 
     def resample(self, data_split, upsample=True) -> Dataset:
         # Fetch factual and non-factual subsplits

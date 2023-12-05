@@ -1,6 +1,8 @@
 # control
-wandb_mode : "online"
+wandb_mode : "offline"
 save_model_at_end : True
+train_summ : False
+train_nli : True
 
 # Hyperparameters
 learning_rate: 1e-4
@@ -9,7 +11,7 @@ weight_decay : 0.01
 batch_size : 32
 eval_batch_size : 32
 sequence_length : 512
-model_name : "meta-llama/Llama-2-7b-chat-hf"
+model_name : "distilbert-base-uncased"
 repetition_penalty : 1.25
 eval_steps : 50  # processing steps before evaluation takes place
 
