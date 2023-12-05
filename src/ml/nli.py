@@ -32,6 +32,8 @@ from transformers import (
 )
 from transformers.tokenization_utils_base import BatchEncoding
 from transformers.trainer_utils import EvalPrediction
+import src.utils.NliTrainer as nt
+import numpy as np
 
 # .env file contains the WANDB_API_KEY and WANDB_PROJECT
 load_dotenv()
@@ -184,12 +186,14 @@ class NLI_Finetune:
             lambda example: example["id"] in train_bbcids
         )
 
-        train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=True)
-        val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=False)
-        
-        # Rebuild the dataset dict
-        self.dataset['train'] = train_upsampled
-        self.dataset['val'] = val_downsampled
+        balance = False
+        if balance:
+            train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=True)
+            val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=False)
+            
+            # Rebuild the dataset dict
+            self.dataset['train'] = train_upsampled
+            self.dataset['val'] = val_downsampled
             
         # make sure that there don't exist a bbcid in both train and val
         train_bbcids = set(self.dataset["train"]["id"])
@@ -268,6 +272,11 @@ class NLI_Finetune:
         
         # Calculate the warmup steps -> 0.5 of steps in an epoch
         self.warmup_steps = int(len(tokenized_datasets["train"]) * self.epochs / self.train_batch_size / 2)
+        # calculate class_weights based on train ["is_factual"] label
+        class_weights = skUtils.class_weight.compute_class_weight(
+            "balanced", classes=[0, 1], y=tokenized_datasets["train"]["is_factual"]
+        )
+
 
         # Training the model with WANDB parameters
         training_args = TrainingArguments(
@@ -302,7 +311,8 @@ class NLI_Finetune:
             push_to_hub_model_id=self.HF_MODEL_NAME + "-xsum-factuality",
         )
 
-        trainer = Trainer(
+        trainer = nt.NliTrainer(
+            class_weights=class_weights,
             model=self.model,  # the instantiated 🤗 Transformers model to be trained
             args=training_args,  # training arguments, defined above
             train_dataset=tokenized_datasets["train"],  # training dataset
