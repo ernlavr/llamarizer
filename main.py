@@ -4,6 +4,7 @@ import wandb
 import src.utils.utilities as utils
 from src.ml.summarizer import Summarizer
 import src.datasets.xSum as xSum
+import src.ml.nli as nli
 
 from huggingface_hub.hf_api import HfFolder
 
@@ -50,9 +51,16 @@ def main():
     print("Init wandb")
     run = initWandb(args)
     print("Init summarizer")
-    summarizer = Summarizer()
-    print("Train")
-    summarizer.train()
+    if args.train_summ:
+        print("Train summarizer")
+        summarizer = Summarizer()
+        summarizer.train()
+    
+    if args.train_nli:
+        print("Train NLI")
+        model = nli.NLI_Finetune()
+        model.finetune()
+    
 
 
 if __name__ == "__main__":

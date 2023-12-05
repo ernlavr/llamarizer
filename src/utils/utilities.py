@@ -8,6 +8,10 @@ def getArgs():
 
     parser.add_argument("--args_path", type=str, default=None, help="Path to args file")
 
+    # Control
+    parser.add_argument("--train_summ", type=bool, default=False, help="Train Summarizer")
+    parser.add_argument("--train_nli", type=bool, default=False, help="Train NLI")
+
     # model hyperparameters
     parser.add_argument(
         "--learning_rate", type=float, default=1e-4, help="Learning rate"
