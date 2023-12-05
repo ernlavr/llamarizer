@@ -36,10 +36,6 @@ from transformers.trainer_utils import EvalPrediction
 # .env file contains the WANDB_API_KEY and WANDB_PROJECT
 load_dotenv()
 
-# set wandb to offline mode
-os.environ["WANDB_MODE"] = "offline"
-
-
 @dataclass
 class NLI_Finetune:
 
@@ -269,19 +265,41 @@ class NLI_Finetune:
             raise ValueError(
                 "WANDB_API_KEY and WANDB_PROJECT must be set in the environment"
             )
+        
+        # Calculate the warmup steps -> 0.5 of steps in an epoch
+        self.warmup_steps = int(len(tokenized_datasets["train"]) * self.epochs / self.train_batch_size / 2)
 
         # Training the model with WANDB parameters
         training_args = TrainingArguments(
+            # Logging
             report_to="wandb",
             run_name="nli_finetuning_run",  # Optionally, add a run name
             output_dir="./results",
             logging_dir="./logs",
             logging_steps=10,
+
+            # Eval
             do_eval=True,
             evaluation_strategy="steps",
             save_strategy="steps",
             save_steps=1000,
-            eval_steps=5,
+            eval_steps=self.eval_steps,
+
+            # Hyperparameters
+            learning_rate=self.learning_rate,
+            warmup_ratio=0.1,
+            weight_decay=self.weight_decay,
+            num_train_epochs=self.epochs,
+            per_device_train_batch_size=self.train_batch_size,
+            per_device_eval_batch_size=self.train_batch_size,
+            warmup_steps=self.warmup_steps,
+            metric_for_best_model="eval_loss",
+            optim="adamw_torch",
+
+            # Huggingface
+            load_best_model_at_end=True,
+            hub_token="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",
+            push_to_hub_model_id=self.HF_MODEL_NAME + "-xsum-factuality",
         )
 
         trainer = Trainer(
@@ -294,11 +312,8 @@ class NLI_Finetune:
 
         trainer.train()
 
-        # Evaluate the model
-        trainer.evaluate()
-
-        # Save the model
-        trainer.save_model("./models/nli_finetuned_model")
+        if wandb.config.save_model_at_end:
+            self.save_model(trainer)
 
 
 if __name__ == "__main__":
