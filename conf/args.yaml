@@ -9,17 +9,17 @@ weight_decay : 0.01
 batch_size : 32
 eval_batch_size : 32
 sequence_length : 512
-model_name : "meta-llama/Llama-2-7b-chat-hf"
+model_name : "meta-llama/Llama-2-7b-hf"
 repetition_penalty : 1.25
-eval_steps : 50  # processing steps before evaluation takes place
+eval_steps : 25  # processing steps before evaluation takes place
 
 # evaluation
-num_examples : 10  # number of examples to save in W&B table
+wandb_num_examples : 10  # number of examples to save in W&B table
 
 # dataset
 train_size: 50000
 val_size: 5000
-use_prompt: True
+use_prompt: False
 
 # Quantization (necessary for Llama2)
 load_in_4bit: True

@@ -34,7 +34,7 @@ def getArgs():
 
 
     # other stuff
-    parser.add_argument("--num_examples", type=int, default=4, help="Number of examples to log")
+    parser.add_argument("--wandb_num_examples", type=int, default=4, help="Number of examples to log")
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
     parser.add_argument("--use_prompt", type=bool, default=False, help="Wraps input text with a prompt")
     parser.add_argument("--additional_info", type=str, default=None, help="Prompt to use")
