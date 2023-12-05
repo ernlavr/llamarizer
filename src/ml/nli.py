@@ -20,7 +20,7 @@ from typing import Dict, List, Set
 
 from datasets import Dataset, load_dataset
 from datasets.dataset_dict import DatasetDict
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import sklearn.utils as skUtils
 from transformers import (
@@ -36,7 +36,7 @@ import src.utils.NliTrainer as nt
 import numpy as np
 
 # .env file contains the WANDB_API_KEY and WANDB_PROJECT
-load_dotenv()
+#load_dotenv()
 
 @dataclass
 class NLI_Finetune:
@@ -186,14 +186,14 @@ class NLI_Finetune:
             lambda example: example["id"] in train_bbcids
         )
 
-        balance = False
-        if balance:
-            train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=True)
-            val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=False)
-            
-            # Rebuild the dataset dict
+        if wandb.config.upsample_train is not None:
+            train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=False)
             self.dataset['train'] = train_upsampled
+
+        if wandb.config.upsample_val is not None:
+            val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=True)
             self.dataset['val'] = val_downsampled
+            
             
         # make sure that there don't exist a bbcid in both train and val
         train_bbcids = set(self.dataset["train"]["id"])
@@ -231,6 +231,17 @@ class NLI_Finetune:
         )
         acc = accuracy_score(labels, preds)
         return {"accuracy": acc, "f1": f1, "precision": precision, "recall": recall}
+
+    def save_model(self, trainer):
+        # save the checkpoints of best performing model
+        run_id = wandb.run.id
+        trainer.save_model(f"./results/best_model_{run_id}")
+
+        # upload the best model weights to wandb
+        artifact = wandb.Artifact(f'model_{run_id}', type='model')
+        artifact.add_dir(f"./results/best_model_{run_id}")
+        wandb.run.log_artifact(artifact)
+        artifact.wait() # wait for artifact to finish uploading
 
     def finetune(self):
         def tokenize_function(examples: Dict) -> BatchEncoding:
@@ -277,7 +288,6 @@ class NLI_Finetune:
             "balanced", classes=[0, 1], y=tokenized_datasets["train"]["is_factual"]
         )
 
-
         # Training the model with WANDB parameters
         training_args = TrainingArguments(
             # Logging
@@ -301,7 +311,6 @@ class NLI_Finetune:
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.train_batch_size,
             per_device_eval_batch_size=self.train_batch_size,
-            warmup_steps=self.warmup_steps,
             metric_for_best_model="eval_loss",
             optim="adamw_torch",
 

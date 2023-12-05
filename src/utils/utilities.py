@@ -35,6 +35,8 @@ def getArgs():
     # dataset hyperparameters
     parser.add_argument("--train_size", type=int, default=100, help="Number of datapoints in training set")
     parser.add_argument("--val_size", type=int, default=10, help="Number of datapoints in validation set")
+    parser.add_argument("--upsample_train", type=bool, help="If true, upsample. False downsamples")
+    parser.add_argument("--upsample_val", type=bool,help="If true, upsample. False downsamples")
 
 
     # other stuff
