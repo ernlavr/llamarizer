@@ -79,6 +79,31 @@ class CustomTrainer(transformers.Trainer):
         return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
     
 
+    def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
+
+        """ Returns a wandb.Table object containing all the artifacts
+            in the run
+        """
+        r1 = np.mean(r1)
+        r2 = np.mean(r2)
+        text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
+
+        num_examples = self.num_examples
+        if len(predictions["document"]) < num_examples:
+            num_examples = len(predictions["document"])
+
+        for i in range(num_examples):
+            document_i = predictions['document'][i]
+            labels_i = predictions['labels'][i]
+            prediction_i = predictions['prediction'][i]
+
+            text_table.add_data(epoch, loss, r1, r2, document_i, labels_i, prediction_i)
+        wandb.run.log({'Training_Samples' : text_table})
+
+    def decode_example(self, example, skip_special_tokens=False):
+        return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
+    
+
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         self.model.eval()

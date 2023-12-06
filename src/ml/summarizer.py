@@ -1,10 +1,13 @@
+import evaluate
+import numpy as np
 import torch
+import transformers
 import wandb
 from peft import (
     LoraConfig,
     TaskType,
-    prepare_model_for_kbit_training,
     get_peft_model,
+    prepare_model_for_kbit_training,
 )
 import transformers
 import src.ml.baseModel as bs
@@ -18,13 +21,16 @@ import os
 
 from transformers.utils import logging
 
+import src.datasets.xSum as xSum
+import src.ml.baseModel as bs
+import src.utils.EvalTrainer as et
 
 logging.set_verbosity_debug()
 logger = logging.get_logger("transformers")
 
 
 class Summarizer(bs.BaseModel):
-    def __init__(self, run):
+    def __init__(self):
         print(f"GPUs available: {torch.cuda.device_count()}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -38,10 +44,9 @@ class Summarizer(bs.BaseModel):
         self.eval_steps = wandb.config.eval_steps
         self.sequence_length = wandb.config.sequence_length
         self.load_in_4bit = wandb.config.load_in_4bit
-        self.wandb_run = run
 
         # metrics
-        self.rouge = evaluate.load('rouge')
+        self.rouge = evaluate.load("rouge")
 
         # Tokenizer
         print("Loading tokenizer")
@@ -89,20 +94,21 @@ class Summarizer(bs.BaseModel):
             model = prepare_model_for_kbit_training(model)
             model = get_peft_model(model, self.peft_config)
         else:
-            model = transformers.AutoModelForCausalLM.from_pretrained(
-                self.model_name
-            )
+            model = transformers.AutoModelForCausalLM.from_pretrained(self.model_name)
 
         return model
 
     def compute_metrics(self, eval_pred):
-        """ Eval_pred consists of a tuple of predictions and labels
-            predictions (1, 1, 1024, 50257)
-            labels (1, 1, 1024)
+        """Eval_pred consists of a tuple of predictions and labels
+        predictions (1, 1, 1024, 50257)
+        labels (1, 1, 1024)
         """
         # if eval_pred is torch, make it numpy
         if isinstance(eval_pred[0], torch.Tensor):
-            eval_pred = [(x[1].detach().cpu().numpy(), x[1].detach().cpu().numpy()) for x in eval_pred]
+            eval_pred = [
+                (x[1].detach().cpu().numpy(), x[1].detach().cpu().numpy())
+                for x in eval_pred
+            ]
 
         # compute ROUGE
         input_ids, predictions, labels = np.squeeze(eval_pred[0]), np.squeeze(eval_pred[1]), np.squeeze(eval_pred[2])
@@ -115,7 +121,7 @@ class Summarizer(bs.BaseModel):
     
         predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
         labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
-        
+
         rouge = self.rouge.compute(predictions=predictions, references=labels)
         wandb.log({"rouge1": rouge["rouge1"]})
         wandb.log({"rouge2": rouge["rouge2"]})
@@ -205,7 +211,6 @@ class Summarizer(bs.BaseModel):
             push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
             hub_token="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",
             load_best_model_at_end=True,
-
             # model quantization stuff
             fp16=wandb.config.load_in_4bit,
             gradient_checkpointing=wandb.config.load_in_4bit,   

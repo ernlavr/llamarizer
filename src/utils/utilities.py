@@ -8,6 +8,10 @@ def getArgs():
 
     parser.add_argument("--args_path", type=str, default=None, help="Path to args file")
 
+    # Control
+    parser.add_argument("--train_summ", type=bool, default=False, help="Train Summarizer")
+    parser.add_argument("--train_nli", type=bool, default=False, help="Train NLI")
+
     # model hyperparameters
     parser.add_argument(
         "--learning_rate", type=float, default=1e-4, help="Learning rate"
@@ -31,6 +35,9 @@ def getArgs():
     # dataset hyperparameters
     parser.add_argument("--train_size", type=int, default=100, help="Number of datapoints in training set")
     parser.add_argument("--val_size", type=int, default=10, help="Number of datapoints in validation set")
+    parser.add_argument("--upsample_train", type=bool, help="If true, upsample. False downsamples")
+    parser.add_argument("--upsample_val", type=bool,help="If true, upsample. False downsamples")
+
 
 
     # other stuff
