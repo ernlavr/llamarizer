@@ -20,7 +20,7 @@ def getArgs():
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay")
     parser.add_argument("--epochs", type=int, default=5, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=24, help="Batch size")
-    parser.add_argument("--eval_batch_size", type=int, default=2, help="Batch size")
+    parser.add_argument("--eval_batch_size", type=int, default=8, help="Batch size")
     parser.add_argument(
         "--sequence_length", type=int, default=512, help="Sequence length"
     )

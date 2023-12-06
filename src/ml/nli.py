@@ -186,11 +186,11 @@ class NLI_Finetune:
             lambda example: example["id"] in train_bbcids
         )
 
-        if wandb.config.upsample_train is not None:
+        if wandb.config.get("upsample_train") is not None:
             train_upsampled = self.resample(self.dataset["train"].to_pandas(), upsample=False)
             self.dataset['train'] = train_upsampled
 
-        if wandb.config.upsample_val is not None:
+        if wandb.config.get("upsample_val") is not None:
             val_downsampled = self.resample(self.dataset["val"].to_pandas(), upsample=True)
             self.dataset['val'] = val_downsampled
             

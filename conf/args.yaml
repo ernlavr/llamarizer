@@ -1,5 +1,5 @@
 # control
-wandb_mode : "online"
+wandb_mode : "offline"
 save_model_at_end : True
 train_summ : False
 train_nli : True
@@ -8,12 +8,12 @@ train_nli : True
 learning_rate: 1e-4
 epochs: 10
 weight_decay : 0.01
-batch_size : 48
+batch_size : 8
 eval_batch_size : 32
 sequence_length : 512
-model_name : "bert-base-uncased"
+model_name : "distilbert-base-uncased"
 repetition_penalty : 1.25
-eval_steps : 10  # processing steps before evaluation takes place
+eval_steps : 2  # processing steps before evaluation takes place
 
 # evaluation
 num_examples : 10  # number of examples to save in W&B table
