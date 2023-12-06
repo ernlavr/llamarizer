@@ -18,12 +18,13 @@ from tqdm import tqdm
 class CustomTrainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         nli_artifact = kwargs.pop("nli_artifact")
-        self.nli_model = nli.NLI_Finetune(nli_artifact)
 
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
         self.repetition_penalty = wandb.config.repetition_penalty
         self.wandb_num_examples = wandb.config.wandb_num_examples
+        if wandb.config.train_with_nli:
+            self.nli_model = nli.NLI_Finetune(nli_artifact, device=self.model.device)
 
 
     def cm(self, preds, labels):
@@ -84,12 +85,17 @@ class CustomTrainer(transformers.Trainer):
     
     def compute_loss(self, model, inputs, return_outputs=False):
         """ Overwrite the compute loss method to use the PEFT loss function """
-        
+        # If we dont want NLI then just proceed with normal loss!
+        if wandb.config.train_with_nli == False:
+            return super().compute_loss(model, inputs, return_outputs)
+
+
+        # Custom loss only for NLI!
         outputs = model(**inputs)
         logits = outputs.logits
         labels = inputs["labels"]
 
-        # compute negative log likelihood
+        # compute summary loss
         summary_loss = F.nll_loss(
             F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)),
             labels.view(-1),
@@ -97,19 +103,24 @@ class CustomTrainer(transformers.Trainer):
             ignore_index=-100,
         )
 
-        # Compute metrics and add to dict
+        # Fetch the prediction span
         preds = torch.softmax(outputs.logits, dim=-1)
         preds = torch.argmax(preds, dim=-1)
         preds[labels == -100] = self.tokenizer.eos_token_id
 
-        # Take the same span that labels have
+        # Decode source document and predictions
         decoded_inputs = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
 
-        # # Perform NLI here
+        # Check NLI on source and predictions
         nli_probs = self.nli_model.infer(decoded_inputs, decoded_preds)
         nli_loss = torch.mean(nli_probs[:, 0]).item()
+
+        # Log
+        wandb.log({"nli_loss": nli_loss})
+        wandb.log({"summary_loss": summary_loss.item()})
         
+        # Combine losses and return
         loss_final = sum([summary_loss, nli_loss])
         return (loss_final, outputs) if return_outputs else loss_final
 
@@ -122,7 +133,7 @@ class CustomTrainer(transformers.Trainer):
         r2 = np.mean(r2)
         text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
 
-        num_examples = self.num_examples
+        num_examples = self.wandb_num_examples
         if len(predictions["document"]) < num_examples:
             num_examples = len(predictions["document"])
 

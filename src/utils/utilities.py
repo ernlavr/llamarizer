@@ -11,6 +11,7 @@ def getArgs():
     # Control
     parser.add_argument("--train_summ", type=bool, default=False, help="Train Summarizer")
     parser.add_argument("--train_nli", type=bool, default=False, help="Train NLI")
+    parser.add_argument("--train_with_nli", type=bool, default=False, help="Train summarizer with NLI")
 
     # model hyperparameters
     parser.add_argument(

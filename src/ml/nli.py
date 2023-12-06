@@ -42,9 +42,9 @@ import numpy as np
 @dataclass
 class NLI_Finetune:
 
-    def __init__(self, artifact_name=None):
+    def __init__(self, artifact_name=None, device=None):
         if artifact_name is not None:
-            self.init_from_wandb(artifact_name)
+            self.init_from_wandb(artifact_name, device)
         else:
             self.init_finetune()
 
@@ -78,11 +78,10 @@ class NLI_Finetune:
             e.g. https://wandb.ai/ernlavr/adv_nlp2023/artifacts/model/model-sleek-sweep-61/v0/usage
         """
         artifact_dir = 'artifacts/model-fresh-sweep-17:v0'
-        if wandb.config.wandb_mode is "online":
-            run = wandb.init()
-            artifact = run.use_artifact(artifact_name, type='model')
+        if wandb.config.wandb_mode == "online":
+            artifact = wandb.run.use_artifact(artifact_name, type='model')
             artifact_dir = artifact.download()
-        self.model = AutoModelForSequenceClassification.from_pretrained(artifact_dir)
+        self.model = AutoModelForSequenceClassification.from_pretrained(artifact_dir).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
 
     @torch.no_grad()
@@ -95,8 +94,8 @@ class NLI_Finetune:
             padding="max_length",
             max_length=512,  # Or any other max length that suits your model
             return_tensors="pt",
-        )
-        inputs_nli.to(self.model.device)
+        ).to(self.model.device)
+        
         outputs_nli = self.model(**inputs_nli)
         logits_nli = outputs_nli.logits
         probs_nli = torch.softmax(logits_nli, dim=-1)
