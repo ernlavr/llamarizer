@@ -53,7 +53,7 @@ class NLI_Finetune:
         # Tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_NAME)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            self.HF_MODEL_NAME, num_labels=2
+            self.HF_MODEL_NAME, num_labels=2, ignore_mismatched_sizes=True
         )
         
         # Datasets
