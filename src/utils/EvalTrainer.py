@@ -78,6 +78,23 @@ class CustomTrainer(transformers.Trainer):
     def decode_example(self, example, skip_special_tokens=False):
         return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
     
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """ Overwrite the compute loss method to use the PEFT loss function """
+        outputs = model(**inputs)
+        logits = outputs.logits
+        labels = inputs["labels"]
+
+        # compute negative log likelihood
+        loss = F.nll_loss(
+            F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)),
+            labels.view(-1),
+            reduction="mean",
+            ignore_index=-100,
+        )
+
+        # Perform NLI computation here and add to loss
+
+        return (loss, outputs) if return_outputs else loss
 
     def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
 
