@@ -9,6 +9,7 @@ from peft import (
 import transformers
 import src.ml.baseModel as bs
 import src.datasets.xSum as xSum
+import src.ml.nli as nli
 import evaluate as eval
 import numpy as np
 import torch.nn.functional as F
@@ -16,6 +17,9 @@ from tqdm import tqdm
 
 class CustomTrainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
+        nli_artifact = kwargs.pop("nli_artifact")
+        self.nli_model = nli.NLI_Finetune(nli_artifact)
+
         super().__init__(*args, **kwargs)
         self.rouge = eval.load('rouge')
         self.repetition_penalty = wandb.config.repetition_penalty
@@ -80,21 +84,34 @@ class CustomTrainer(transformers.Trainer):
     
     def compute_loss(self, model, inputs, return_outputs=False):
         """ Overwrite the compute loss method to use the PEFT loss function """
+        
         outputs = model(**inputs)
         logits = outputs.logits
         labels = inputs["labels"]
 
         # compute negative log likelihood
-        loss = F.nll_loss(
+        summary_loss = F.nll_loss(
             F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)),
             labels.view(-1),
             reduction="mean",
             ignore_index=-100,
         )
 
-        # Perform NLI computation here and add to loss
+        # Compute metrics and add to dict
+        preds = torch.softmax(outputs.logits, dim=-1)
+        preds = torch.argmax(preds, dim=-1)
+        preds[labels == -100] = self.tokenizer.eos_token_id
 
-        return (loss, outputs) if return_outputs else loss
+        # Take the same span that labels have
+        decoded_inputs = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
+        decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
+
+        # # Perform NLI here
+        nli_probs = self.nli_model.infer(decoded_inputs, decoded_preds)
+        nli_loss = torch.mean(nli_probs[:, 0]).item()
+        
+        loss_final = sum([summary_loss, nli_loss])
+        return (loss_final, outputs) if return_outputs else loss_final
 
     def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
 

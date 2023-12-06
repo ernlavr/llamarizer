@@ -15,6 +15,7 @@ Developed on DistilBert, but can be changed to any model from huggingface:
 import os
 import wandb
 import pandas as pd
+import torch
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
@@ -41,7 +42,14 @@ import numpy as np
 @dataclass
 class NLI_Finetune:
 
-    def __init__(self):
+    def __init__(self, artifact_name=None):
+        if artifact_name is not None:
+            self.init_from_wandb(artifact_name)
+        else:
+            self.init_finetune()
+
+    def init_finetune(self):
+        """ Initialize fine-tuning of the model """
         # Hyper parameters
         self.HF_MODEL_NAME: str = wandb.config.model_name
         self.learning_rate: float = wandb.config.learning_rate
@@ -63,6 +71,37 @@ class NLI_Finetune:
         self.merged_dataset: Dataset = None
         self.dataset: DatasetDict = None
         self.post_init()
+
+    def init_from_wandb(self, artifact_name, device=None):
+        """ Initialize a pretrained model from WANDB for inference
+            Artifact name needs to be the full name of the artifact
+            e.g. https://wandb.ai/ernlavr/adv_nlp2023/artifacts/model/model-sleek-sweep-61/v0/usage
+        """
+        artifact_dir = 'artifacts/model-fresh-sweep-17:v0'
+        if wandb.config.wandb_mode is "online":
+            run = wandb.init()
+            artifact = run.use_artifact(artifact_name, type='model')
+            artifact_dir = artifact.download()
+        self.model = AutoModelForSequenceClassification.from_pretrained(artifact_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
+
+    @torch.no_grad()
+    def infer(self, document, summary):
+        """ Returns probability density of two labels; 0 is non-factual, 1 is factual """
+        inputs_nli = self.tokenizer(
+            text=document,  # First part of the input
+            text_pair=summary,  # Second part of the input
+            truncation="only_first",  # Truncate only the first part (document) if the combined input is too long
+            padding="max_length",
+            max_length=512,  # Or any other max length that suits your model
+            return_tensors="pt",
+        )
+        inputs_nli.to(self.model.device)
+        outputs_nli = self.model(**inputs_nli)
+        logits_nli = outputs_nli.logits
+        probs_nli = torch.softmax(logits_nli, dim=-1)
+        return probs_nli
+
  
     def post_init(self):
         self.merge_datasets()

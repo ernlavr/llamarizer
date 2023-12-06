@@ -219,6 +219,7 @@ class Summarizer(bs.BaseModel):
         )
         
         trainer = et.CustomTrainer(
+            nli_artifact='ernlavr/adv_nlp2023/model-fresh-sweep-17:v0',
             model=self.model,
             args=training_args,
             train_dataset=self.dataset.train_tokenized,
