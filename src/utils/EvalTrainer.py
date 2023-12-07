@@ -85,23 +85,16 @@ class CustomTrainer(transformers.Trainer):
     
     def compute_loss(self, model, inputs, return_outputs=False, evaluation=False):
         """ Overwrite the compute loss method to use the PEFT loss function """
-        # If we dont want NLI then just proceed with normal loss!
+
+        # Compute the NLL loss for the summarizer and return if applicable
+        # Always compute outputs but return them only if necessary
+        loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
         if wandb.config.train_with_nli == False:
-            return super().compute_loss(model, inputs, return_outputs)
+            return (loss, outputs) if return_outputs else loss
 
-
-        # Custom loss only for NLI!
-        outputs = model(**inputs)
-        logits = outputs.logits
-        labels = inputs["labels"]
-
-        # compute summary loss
-        summary_loss = F.nll_loss(
-            F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)),
-            labels.view(-1),
-            reduction="mean",
-            ignore_index=-100,
-        )
+        # Proceed with computing NLI loss
+        labels = inputs['labels']
+        input_ids = inputs['input_ids']
 
         # Fetch the prediction span
         preds = torch.softmax(outputs.logits, dim=-1)
@@ -109,7 +102,7 @@ class CustomTrainer(transformers.Trainer):
         preds[labels == -100] = self.tokenizer.eos_token_id
 
         # Decode source document and predictions
-        decoded_inputs = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
+        decoded_inputs = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
 
         # Check NLI on source and predictions
@@ -121,10 +114,10 @@ class CustomTrainer(transformers.Trainer):
         if evaluation:
             log_prefix = "eval"
         wandb.log({f"{log_prefix}/nli_loss": nli_loss})
-        wandb.log({f"{log_prefix}/summary_loss": summary_loss.item()})
+        wandb.log({f"{log_prefix}/summary_loss": loss.item()})
         
         # Combine losses and return
-        loss_final = sum([summary_loss, nli_loss])
+        loss_final = sum([loss, nli_loss])
         return (loss_final, outputs) if return_outputs else loss_final
 
     def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
@@ -206,6 +199,6 @@ class CustomTrainer(transformers.Trainer):
         # finish up
         avg_loss = total_loss / total_steps
         self.model.train()
-        wandb.log({"eval_loss": avg_loss})
+        wandb.log({"eval/loss": avg_loss})
         self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], result_summary)
         return {"eval_loss": avg_loss}
