@@ -83,7 +83,7 @@ class CustomTrainer(transformers.Trainer):
     def decode_example(self, example, skip_special_tokens=False):
         return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
     
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, evaluation=False):
         """ Overwrite the compute loss method to use the PEFT loss function """
         # If we dont want NLI then just proceed with normal loss!
         if wandb.config.train_with_nli == False:
@@ -117,8 +117,11 @@ class CustomTrainer(transformers.Trainer):
         nli_loss = torch.mean(nli_probs[:, 0]).item()
 
         # Log
-        wandb.log({"nli_loss": nli_loss})
-        wandb.log({"summary_loss": summary_loss.item()})
+        log_prefix = "train"
+        if evaluation:
+            log_prefix = "eval"
+        wandb.log({f"{log_prefix}/nli_loss": nli_loss})
+        wandb.log({f"{log_prefix}/summary_loss": summary_loss.item()})
         
         # Combine losses and return
         loss_final = sum([summary_loss, nli_loss])
@@ -159,11 +162,11 @@ class CustomTrainer(transformers.Trainer):
         result_summary = {"document" : [], "labels" : [], "prediction" : []}
         
 
-        for inputs in eval_dataloader:
+        for inputs in tqdm(eval_dataloader, "Evaluating.."):
             with torch.no_grad():
                 # get predictions
                 inputs = self._prepare_inputs(inputs)
-                loss, outputs = self.compute_loss(self.model, inputs, return_outputs=True)
+                loss, outputs = self.compute_loss(self.model, inputs, return_outputs=True, evaluation=True)
                 total_loss += loss.item()
                 total_steps += 1
 

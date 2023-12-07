@@ -83,6 +83,7 @@ class NLI_Finetune:
             artifact_dir = artifact.download()
         self.model = AutoModelForSequenceClassification.from_pretrained(artifact_dir).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
+        print(f"Initialized NLI model on Device: {device}")
 
     @torch.no_grad()
     def infer(self, document, summary):
