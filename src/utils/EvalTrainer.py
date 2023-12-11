@@ -27,16 +27,30 @@ class CustomTrainer(transformers.Trainer):
             self.nli_model = nli.NLI_Finetune(nli_artifact, device=self.model.device)
 
 
-    def cm(self, preds, labels):
+    def cm(self, raw_preds, preds, labels):
         """ Eval_pred consists of a tuple of predictions and labels
             predictions (1, 1, 1024, 50257)
             labels (1, 1, 1024)
         """
+        raw_preds = self.tokenizer.batch_decode(raw_preds, skip_special_tokens=True)
         predictions = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
         labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
         
+        raw_rouge = self.rouge.compute(predictions=raw_preds, references=labels)
         rouge = self.rouge.compute(predictions=predictions, references=labels)
-        return rouge
+
+        # Raw-Rouge is scores from predictions that are not filtered according to label span
+        output = {"Raw_R1" : raw_rouge["rouge1"], 
+                  "Raw_R2" : raw_rouge["rouge2"], 
+                  "Raw_RougeL" : raw_rouge["rougeL"],
+                  "Raw_RougeLsum" : raw_rouge["rougeLsum"],
+
+                  "R1" : rouge["rouge1"], 
+                  "R2" : rouge["rouge2"],
+                  "RougeL" : rouge["rougeL"],
+                  "RougeLsum" : rouge["rougeLsum"]
+                }
+        return output
 
     def push_artifacts_table(self, epoch, loss, r1, r2, source, prediction, target):
         """ Returns a wandb.Table object containing all the artifacts
@@ -59,14 +73,17 @@ class CustomTrainer(transformers.Trainer):
         wandb.run.log({'Training_Samples' : text_table})
 
 
-    def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
+    def push_artifacts_table(self, epoch, loss, metrics, predictions):
 
         """ Returns a wandb.Table object containing all the artifacts
             in the run
         """
-        r1 = np.mean(r1)
-        r2 = np.mean(r2)
-        text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
+        r1 = np.mean(metrics["R1"])
+        r2 = np.mean(metrics["R2"])
+        rr1 = np.mean(metrics["Raw_R1"])
+        rr2 = np.mean(metrics["Raw_R2"])
+
+        text_table = wandb.Table(columns=["epoch", "loss", "R1", "R2", "RawR1", "RawR2", "document", "target", "prediction", "raw_prediction"])
 
         num_examples = self.wandb_num_examples
         if len(predictions["document"]) < num_examples:
@@ -76,8 +93,9 @@ class CustomTrainer(transformers.Trainer):
             document_i = predictions['document'][i]
             labels_i = predictions['labels'][i]
             prediction_i = predictions['prediction'][i]
+            raw_prediction_i = predictions['raw_prediction'][i]
 
-            text_table.add_data(epoch, loss, r1, r2, document_i, labels_i, prediction_i)
+            text_table.add_data(epoch, loss, r1, r2, rr1, rr2, document_i, labels_i, prediction_i, raw_prediction_i)
         wandb.run.log({'Training_Samples' : text_table})
 
     def decode_example(self, example, skip_special_tokens=False):
@@ -120,26 +138,6 @@ class CustomTrainer(transformers.Trainer):
         loss_final = sum([loss, nli_loss])
         return (loss_final, outputs) if return_outputs else loss_final
 
-    def push_artifacts_table(self, epoch, loss, r1, r2, predictions):
-
-        """ Returns a wandb.Table object containing all the artifacts
-            in the run
-        """
-        r1 = np.mean(r1)
-        r2 = np.mean(r2)
-        text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
-
-        num_examples = self.wandb_num_examples
-        if len(predictions["document"]) < num_examples:
-            num_examples = len(predictions["document"])
-
-        for i in range(num_examples):
-            document_i = predictions['document'][i]
-            labels_i = predictions['labels'][i]
-            prediction_i = predictions['prediction'][i]
-
-            text_table.add_data(epoch, loss, r1, r2, document_i, labels_i, prediction_i)
-        wandb.run.log({'Training_Samples' : text_table})
 
     def decode_example(self, example, skip_special_tokens=False):
         return self.tokenizer.decode(example, skip_special_tokens=skip_special_tokens)
@@ -152,7 +150,7 @@ class CustomTrainer(transformers.Trainer):
         total_steps = 0
         result_count = 0
         metrics = {}
-        result_summary = {"document" : [], "labels" : [], "prediction" : []}
+        result_summary = {"document" : [], "labels" : [], "prediction" : [], "raw_prediction" : []}
         
 
         for inputs in tqdm(eval_dataloader, "Evaluating.."):
@@ -168,6 +166,7 @@ class CustomTrainer(transformers.Trainer):
                 outputs = torch.argmax(outputs, dim=-1)
 
                 # replace every outputs index with eos_token_id where label is -100
+                raw_outputs = outputs.clone()
                 outputs[inputs["labels"] == -100] = self.tokenizer.eos_token_id
 
                 # After loss computation, turn the label -100s to pad_token_id
@@ -175,7 +174,7 @@ class CustomTrainer(transformers.Trainer):
                 labels = inputs["labels"]
                 labels[labels == -100] = self.tokenizer.eos_token_id
 
-                computed_metrics = self.cm(outputs, labels)
+                computed_metrics = self.cm(raw_outputs, outputs, labels)
                 for key, value in computed_metrics.items():
                     if key in metrics:
                         metrics[key].append(value)
@@ -189,16 +188,17 @@ class CustomTrainer(transformers.Trainer):
                         result_summary["document"].append(self.decode_example(inputs["input_ids"][i].squeeze()))
                         result_summary["labels"].append(self.decode_example(labels[i].squeeze(), True))
                         result_summary["prediction"].append(self.decode_example(outputs[i].squeeze(), True))
+                        result_summary["raw_prediction"].append(self.decode_example(raw_outputs[i].squeeze(), True))
 
         # log each metrics to wandb
         for key, value in metrics.items():
             val = round(np.mean(value), 4)
             print(f"Logging {key}: {val}")
-            wandb.log({key: val})
+            wandb.log({f"eval/{key}": val})
 
         # finish up
         avg_loss = total_loss / total_steps
         self.model.train()
         wandb.log({"eval/loss": avg_loss})
-        self.push_artifacts_table(self.state.epoch, avg_loss, metrics["rouge1"], metrics["rouge2"], result_summary)
+        self.push_artifacts_table(self.state.epoch, avg_loss, metrics, result_summary)
         return {"eval_loss": avg_loss}
