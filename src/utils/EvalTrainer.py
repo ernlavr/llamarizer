@@ -52,26 +52,6 @@ class CustomTrainer(transformers.Trainer):
                 }
         return output
 
-    def push_artifacts_table(self, epoch, loss, r1, r2, source, prediction, target):
-        """ Returns a wandb.Table object containing all the artifacts
-            in the run
-        """
-        r1 = np.mean(r1)
-        r2 = np.mean(r2)
-        text_table = wandb.Table(columns=["epoch", "loss", "Rouge1", "Rouge2", "document", "target", "prediction"])
-
-        num_examples = 4
-        if prediction.shape[0] < 4:
-            num_examples = prediction.shape[0]
-
-        for i in range(num_examples):
-            source_i = self.tokenizer.decode(source[i])
-            target_i = self.tokenizer.decode(target[i])
-            prediction_i = self.tokenizer.decode(prediction[i])
-
-            text_table.add_data(epoch, loss, r1, r2, source_i, target_i, prediction_i)
-        wandb.run.log({'Training_Samples' : text_table})
-
 
     def push_artifacts_table(self, epoch, loss, metrics, predictions):
 
