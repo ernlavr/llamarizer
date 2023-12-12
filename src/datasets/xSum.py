@@ -55,9 +55,9 @@ class XSum:
                 continue
         
             sample = {
-                "input_ids": np.array(prompt),
-                "attention_mask": np.array([1] * len(prompt)),
-                "labels": np.array([-100] * (len(prompt) - len(summary)) + summary)
+                "input_ids": np.array(prompt + summary),
+                "attention_mask": np.array([1] * len(prompt) + [0] * len(summary)),
+                "labels": np.array([-100] * len(prompt) + summary)
             }
             output.append(sample)
         print(f"Skipped {skipped_counter} examples")
