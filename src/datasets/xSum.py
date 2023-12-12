@@ -40,23 +40,6 @@ class XSum:
             "summary": example["summary"],
         }
 
-    def tokenize_add_label(self, examples):
-        tokenizer = self.tokenizer
-        prompt = tokenizer.encode(tokenizer.bos_token + examples["document"], add_special_tokens=False)
-        summary = tokenizer.encode(examples["summary"] + tokenizer.eos_token, add_special_tokens=False)
-
-        # Skip examples that are too long. This will create empty examples that need to be removed later
-        if len(prompt) > wandb.config.sequence_length:
-            self.skipped_counter += 1
-            return
-
-        attention_mask = [1] * len(prompt) + [0] * len(summary)
-        sample = {
-            "input_ids": np.array(prompt + summary),
-            "attention_mask": np.array(attention_mask),
-            "labels": np.array([-100] * len(prompt) + summary)
-        }
-        return sample
 
     def preprocess(self, dataset):
         tokenizer = self.tokenizer
@@ -73,7 +56,7 @@ class XSum:
         
             sample = {
                 "input_ids": np.array(prompt + summary),
-                "attention_mask": np.array([1] * (len(prompt) + len(summary))),
+                "attention_mask": np.array([1] * len(prompt) + [0] * len(summary)),
                 "labels": np.array([-100] * len(prompt) + summary)
             }
             output.append(sample)

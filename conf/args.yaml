@@ -1,15 +1,17 @@
 # control
-wandb_mode : "online"
+wandb_mode : "offline"
 save_model_at_end : True
+train_summ : False
+train_nli : True
 
 # Hyperparameters
 learning_rate: 1e-4
 epochs: 2
 weight_decay : 0.01
-batch_size : 32
-eval_batch_size : 32
+batch_size : 4
+eval_batch_size : 2
 sequence_length : 512
-model_name : "meta-llama/Llama-2-7b-hf"
+model_name : "distilgpt2"
 repetition_penalty : 1.25
 eval_steps : 25  # processing steps before evaluation takes place
 
@@ -17,9 +19,9 @@ eval_steps : 25  # processing steps before evaluation takes place
 wandb_num_examples : 10  # number of examples to save in W&B table
 
 # dataset
-train_size: 50000
-val_size: 5000
-use_prompt: False
+train_size: 32
+val_size: 16
+use_prompt: True
 
 # Quantization (necessary for Llama2)
-load_in_4bit: True
+load_in_4bit: False
