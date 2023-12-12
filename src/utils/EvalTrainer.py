@@ -163,7 +163,7 @@ class CustomTrainer(transformers.Trainer):
 
                 # save the predictions
                 for i, _ in enumerate(outputs):
-                    if result_count <= 5:
+                    if result_count <= wandb.config.wandb_num_examples:
                         result_count += 1
                         result_summary["document"].append(self.decode_example(inputs["input_ids"][i].squeeze()))
                         result_summary["labels"].append(self.decode_example(labels[i].squeeze(), True))
