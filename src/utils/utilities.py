@@ -1,6 +1,14 @@
 import argparse
-
 import omegaconf
+from peft import (
+    LoraConfig,
+    TaskType,
+    get_peft_model,
+    prepare_model_for_kbit_training,
+)
+import transformers
+import wandb
+import numpy as np
 
 
 def getArgs():
@@ -60,3 +68,47 @@ def getArgs():
         args = argparse.Namespace(**args)
 
     return args
+
+    
+def get_peft_config():
+    return LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            r=8,
+            lora_alpha=16,
+            lora_dropout=0.05,
+            bias="none"
+        )
+
+def get_bnb_config():
+    return transformers.BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype="bfloat16",
+        )
+
+def load_from_wandb(id, load_in_4bit, peft_config, bnb_config):
+    # load the model from wandb
+    artifact = wandb.run.use_artifact(id, type="model")
+    artifact_dir = artifact.download()
+
+    return get_model(artifact_dir, load_in_4bit, peft_config, bnb_config)
+
+
+def get_model(id, load_in_4bit=False, peft_config=None, bnb_config=None):
+    model = None
+    if load_in_4bit:
+        # TODO: review model loading according to llama-recipes
+        model = transformers.AutoModelForCausalLM.from_pretrained(
+            id, 
+            quantization_config=bnb_config,
+            device_map="auto"
+        )
+        model = prepare_model_for_kbit_training(model)
+        model = get_peft_model(model, peft_config)
+    else:
+        model = transformers.AutoModelForCausalLM.from_pretrained(id)
+
+    # load tokenizer and return
+    tokenizer = transformers.AutoTokenizer.from_pretrained(id)
+    return model, tokenizer
