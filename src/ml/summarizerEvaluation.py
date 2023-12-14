@@ -13,7 +13,7 @@ class LlamarizerEval():
         self.bnb_config = utils.get_bnb_config()
         self.peft_config = utils.get_peft_config()
 
-        wandb_output = utils.load_from_wandb("ernlavr/adv_nlp2023/model_nioagqxs:v0", 
+        wandb_output = utils.get_model(wandb.config.model_name, 
                                              load_in_4bit=False, 
                                              peft_config=None, 
                                              bnb_config=None)
@@ -121,6 +121,15 @@ class LlamarizerEval():
             "labels": labels,
         }
 
+    def merge_results(self, buffer, metrics):
+        """ Merges the results of the metrics into a single dictionary """
+        for key in metrics.keys():
+            if key not in buffer:
+                buffer[key] = []
+            buffer[key].append(metrics[key])
+
+        return buffer
+
     def eval(self):
         self.model.eval()
         
@@ -132,6 +141,7 @@ class LlamarizerEval():
         )
 
         # run inference
+        metric_accumulation = {}
         for batch in eval_dataloader:
             # Decode labels
             labels = batch["labels"]
@@ -144,7 +154,17 @@ class LlamarizerEval():
 
             # Compute the metrics
             metrics = self.compute_metrics(preds, labels)
+            metric_accumulation = self.merge_results(metric_accumulation, metrics)
 
             # Log
             inputs = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
             self.push_artifacts_table(inputs, preds, labels, metrics)
+
+        # Log the mean + std of each metrics
+        for key in metric_accumulation.keys():
+            # compute
+            mean = np.mean(metric_accumulation[key])
+            std = np.std(metric_accumulation[key])
+
+            # round and print
+            print(f"{key}: {round(mean, 3)} +- {round(std, 3)}")
