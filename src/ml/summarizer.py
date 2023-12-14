@@ -81,6 +81,8 @@ class Summarizer(bs.BaseModel):
             self.model.config.pad_token_id = self.model.config.eos_token_id
             #self.model.resize_token_embeddings(self.model.config.vocab_size + 1)
         
+    
+
 
     def get_model(self):
         model = None
@@ -132,6 +134,7 @@ class Summarizer(bs.BaseModel):
         logUtils.push_artifacts_table("n/a", "n/a", rouge["rouge1"], rouge["rouge2"], )
 
         return {'rouge': rouge}
+
 
     def tokenize(self, text):
         return self.tokenizer(
