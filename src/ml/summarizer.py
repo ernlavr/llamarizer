@@ -181,7 +181,23 @@ class Summarizer(bs.BaseModel):
         wandb.run.log_artifact(artifact)
         artifact.wait() # wait for artifact to finish uploading
 
+    def print_trainable_parameters(self, model):
+        """
+        Prints the number of trainable parameters in the model.
+        """
+        trainable_params = 0
+        all_param = 0
+        for _, param in model.named_parameters():
+            all_param += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+        print(
+            f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+        )
+
     def train(self):
+        self.print_trainable_parameters(self.model)
+
         # Prepare the model for training
         training_args = transformers.TrainingArguments(
             # logging
@@ -198,7 +214,6 @@ class Summarizer(bs.BaseModel):
             # hyperparameters
             learning_rate=self.learning_rate,
             warmup_ratio=0.1,
-            max_grad_norm=0.3,
             weight_decay=self.weight_decay,
             num_train_epochs=self.epochs,
             per_device_train_batch_size=self.train_batch_size,
