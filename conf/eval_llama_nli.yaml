@@ -1,0 +1,29 @@
+# control
+wandb_mode : "offline"
+save_model_at_end : False     # ignored in eval
+train_summ : False
+train_with_nli : False
+train_nli : False
+eval_summ : True
+
+# Hyperparameters
+learning_rate: 1e-3           # ignored in eval
+epochs: 2                     # ignored in eval
+weight_decay : 0.01           # ignored in eval
+batch_size : 8                # ignored in eval
+eval_batch_size : 8
+sequence_length : 512         # ignored in eval
+model_name : "ernlavr/adv_nlp2023/model_w5g89vq7:v0"
+repetition_penalty : 1.25 
+eval_steps : 25               # ignored in eval
+
+# evaluation
+wandb_num_examples : 10       # ignored in eval
+
+# dataset
+train_size: 32                # ignored in eval
+val_size: 5000
+use_prompt: True
+
+# Quantization (necessary for Llama2)
+load_in_4bit: True

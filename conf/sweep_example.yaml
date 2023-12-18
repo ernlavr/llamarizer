@@ -1,0 +1,57 @@
+# Config for running WANDB param-sweeps
+# Reference: https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+# Create a sweep agent: `wandb sweep --project adv_nlp2023 conf/config.yaml`
+
+program: main.py
+method: grid # grid, bayes, random
+parameters:
+  # Single Flags
+  train_nli:
+    values:
+      - True
+  save_model_at_end:
+    values:
+      - False
+  upsample_val:
+    values:
+      - True
+  eval_steps:
+    values:
+      - 20
+
+  # Param-sweep
+  model_name:
+    values:
+      - "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
+      - "typeform/distilbert-base-uncased-mnli"
+
+  upsample_train:
+    values:
+      - True
+      - None
+  
+  batch_size:
+    values:
+      - 2
+      - 4
+      - 8
+      - 16
+
+  learning_rate:
+    values:
+      - 0.0001
+      - 0.00001
+      - 0.000001
+
+  weight_decay:
+    values:
+      - 0.1
+      - 0.01
+      - 0.001
+  
+  epochs:
+    values:
+      - 15
+metric:
+  name: eval/accuracy # https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+  goal: maximize

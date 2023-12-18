@@ -1,0 +1,31 @@
+# Config for running WANDB param-sweeps
+# Reference: https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+# Create a sweep agent: `wandb sweep --project adv_nlp2023 conf/config.yaml`
+
+program: main.py
+method: grid # grid, bayes, random
+parameters:
+  # Single Flags
+  eval_summ:
+    values:
+      - True
+  model_name:
+    values:
+      - "meta-llama/Llama-2-7b-hf"
+      - "meta-llama/Llama-2-7b-chat-hf"
+      - "ernlavr/adv_nlp2023/model_glwgz9uz:v0"
+  repetition_penalty:
+    values:
+      - 1.0
+      - 1.25
+      - 1.5
+  use_prompt:
+    values:
+      - True
+      - False
+  val_size:
+    values:
+      - 5000
+metric:
+  name: avg_mean/rouge2 # https://docs.wandb.ai/guides/sweeps/define-sweep-configuration
+  goal: maximize

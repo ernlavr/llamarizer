@@ -1,0 +1,31 @@
+# control
+wandb_mode : "online"
+save_model_at_end : True
+train_summ : False
+train_with_nli : False
+train_nli : True
+eval_summ : False
+
+# Hyperparameters
+learning_rate: 0.000001
+epochs: 7
+weight_decay : 0.001
+batch_size : 2
+eval_batch_size : 8
+sequence_length : 512
+model_name : "distilbert-base-uncased"
+repetition_penalty : 1.25
+eval_steps : 20  # processing steps before evaluation takes place
+upsample_train : False
+upsample_val : True
+
+# evaluation
+wandb_num_examples : 10  # number of examples to save in W&B table
+
+# dataset
+train_size: 6000
+val_size: 6000
+use_prompt: True
+
+# Quantization (necessary for Llama2)
+load_in_4bit: True

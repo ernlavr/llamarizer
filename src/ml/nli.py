@@ -371,6 +371,7 @@ class NLI_Finetune:
         trainer.train()
 
         if wandb.config.save_model_at_end:
+            trainer.push_to_hub()
             self.save_model(trainer)
 
 
