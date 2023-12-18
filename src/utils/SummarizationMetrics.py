@@ -56,6 +56,7 @@ class ANLI:
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
+        self.model.eval()
         self.max_length = max_length
 
     def compute(self, sources, summaries):
@@ -84,6 +85,7 @@ class SummaC:
     def __init__(self,device = "cuda"):
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.model = SummaCConv(models=["vitc"], bins='percentile', granularity="sentence", nli_labels="e", device=self.device, start_file="default", agg="mean") 
+        self.model.eval()
 
     def compute(self, sources, summaries):
         scores = self.model.score(sources, summaries)
