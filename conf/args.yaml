@@ -1,17 +1,17 @@
 # control
 wandb_mode : "online"
-save_model_at_end : True
-train_summ : True
-train_with_nli : True
+save_model_at_end : False
+train_summ : False
+train_with_nli : False
 train_nli : False
-eval_summ : False
+eval_summ : True
 
 # Hyperparameters
 learning_rate: 1e-3
 epochs: 2
 weight_decay : 0.01
-batch_size : 4
-eval_batch_size : 4
+batch_size : 8
+eval_batch_size : 8
 sequence_length : 512
 model_name : "ernlavr/adv_nlp2023/model_glwgz9uz:v0"
 repetition_penalty : 1.25

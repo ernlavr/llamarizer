@@ -3,6 +3,7 @@ import src.datasets.xSum as xSum
 import src.utils.utilities as utils
 from src.utils.SummarizationMetrics import FactCC, ANLI, SummaC, SummarizationMetrics
 from src.utils.BARTScore.bart_score import BARTScorer
+from tqdm import tqdm
 import nltk
 import numpy as np
 import torch
@@ -49,10 +50,10 @@ class LlamarizerEval():
 
         # Metrics
         self.rouge = evaluate.load("rouge")
-        self.factcc = FactCC('cuda:1')
-        self.anli = ANLI('cuda:1')
-        #self.summac = SummaC('cuda:1')
-        #self.bart_scorer = BARTScorer(checkpoint='facebook/bart-large-cnn')
+        self.factcc = FactCC(device='cuda')
+        self.anli = ANLI(device='cuda')
+        self.summac = SummaC('cuda')
+        self.bart_scorer = BARTScorer(checkpoint='facebook/bart-large-cnn')
         self.summarization_metrics = SummarizationMetrics()
         print("Initialized LlamarizerEval")
 
@@ -70,10 +71,10 @@ class LlamarizerEval():
         ANLI_score = self.anli.compute(inputs, predictions)
 
         # # Compute SummaC
-        # SummaC_score = self.summac.compute(inputs, predictions)
+        SummaC_score = self.summac.compute(inputs, predictions)
 
         # # Compute BART
-        # BARTscores = self.bart_scorer.score(labels, predictions, batch_size=self.eval_batch)
+        BARTscores = self.bart_scorer.score(labels, predictions, batch_size=self.eval_batch)
         
         # Rouge
         output.update(summary_metrics_out)
@@ -82,8 +83,8 @@ class LlamarizerEval():
         output['rougeL'] = rouge_output['rougeL']
         output['FactCC'] = FactCC_score
         output['ANLI'] = ANLI_score
-        output['SummaC'] = [-1]  * len(rouge_output['rouge1']) #SummaC_score
-        output['BARTScore'] = [-1]  * len(rouge_output['rouge1']) #BARTscores
+        output['SummaC'] = SummaC_score
+        output['BARTScore'] = BARTscores
 
         wandb.log(output)
         return output
@@ -106,20 +107,6 @@ class LlamarizerEval():
         SummaC_scores=metrics["SummaC"]
         BARTScores=metrics["BARTScore"]
 
-        # print all metric types
-        print(f"r1s: {type(r1s)}")
-        print(f"r2s: {type(r2s)}")
-        print(f"rls: {type(rls)}")
-        print(f"red_score: {type(red_score)}")
-        print(f"novel_1gram_ratio: {type(novel_1gram_ratio)}")
-        print(f"novel_2gram_ratio: {type(novel_2gram_ratio)}")
-        print(f"novel_3gram_ratio: {type(novel_3gram_ratio)}")
-        print(f"compression_score: {type(compression_score)}")
-        print(f"FactCC_scores: {type(FactCC_scores)}")
-        print(f"ANLI_scores: {type(ANLI_scores)}")
-        print(f"SummaC_scores: {type(SummaC_scores)}")
-        print(f"BARTScores: {type(BARTScores)}")
-
         text_table = wandb.Table(columns=["inputs", "pred", "ref", "R1", "R2", "RougeL",
                                           'red_score', 'novel_1gram_ratio', 'novel_2gram_ratio', 'novel_3gram_ratio', 'compression_score', 'FactCC', 'ANLI', 'SummaC', 'BARTScore'])
 
@@ -135,20 +122,16 @@ class LlamarizerEval():
         input_ids = batch['input_ids'].to('cuda')
         attention_mask = batch['attention_mask'].to('cuda')
         seq_len = input_ids.shape[1] + label_length
-
-        # generate the summary
-        # print devices
-        print(f"input_ids device: {input_ids.device}")
-        print(f"attention_mask device: {attention_mask.device}")
-        print(f"model device: {self.model.device}")
         
-        input_ids.to(self.model.device)
-        attention_mask.to(self.model.device)
+        input_ids.to('cuda')
+        attention_mask.to('cuda')
 
         summary_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            max_length=512
+            max_length=label_length * 2,
+            repetition_penalty=self.rep_pen,
+            length_penalty=-1.0,
         )
 
         # decode the summary
@@ -215,7 +198,7 @@ class LlamarizerEval():
         # run inference
         metric_accumulation = {}
         print("Starting eval loop")
-        for batch in eval_dataloader:
+        for batch in tqdm(eval_dataloader, "Evaluating"):
             # Decode labels
             labels = batch["labels"]
             label_length = len(labels[labels != -100])

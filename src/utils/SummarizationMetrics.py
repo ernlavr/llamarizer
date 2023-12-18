@@ -52,7 +52,7 @@ class FactCC:
 
 class ANLI:
 
-    def __init__(self,max_length = 512, model_name = "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli", device = "cuda"):
+    def __init__(self, max_length = 512, model_name = "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli", device = "cuda"):
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
@@ -62,7 +62,7 @@ class ANLI:
         
         preds = []
         for source, summary in zip(sources, summaries):
-            tokenized_input_seq_pair = self.tokenizer.encode_plus(source, summary, max_length=self.max_length,
+            tokenized_input_seq_pair = self.tokenizer.encode_plus(source, summary, max_length=512,
                                                      return_token_type_ids=True, truncation=True)
             input_ids = torch.Tensor(tokenized_input_seq_pair['input_ids']).long().unsqueeze(0).to(self.device)
 
@@ -159,7 +159,7 @@ class SummarizationMetrics:
             summary_ngrams = list(ngrams(summary_tokens, n))
             freq_dist = FreqDist(summary_ngrams)
             repeated_ngrams_count = sum(fi - 1 for fi in freq_dist.values())
-            total_ngrams_count = len(summary_ngrams)
+            total_ngrams_count = len(summary_ngrams) + 0.001 # avoid division by zero
 
             red_score = 1 - (repeated_ngrams_count / total_ngrams_count)
             return red_score
