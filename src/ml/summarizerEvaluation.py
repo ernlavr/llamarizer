@@ -113,6 +113,11 @@ class LlamarizerEval():
         for (i, p, l,r1,r2,rl,rs,novel_1g,novel_2g,novel_3g,compression_sc,FactCC_score,ANLI_score,SummaC_score,BARTScore ) in zip(inputs, preds, labels,r1s,r2s,rls,red_score,novel_1gram_ratio,novel_2gram_ratio,novel_3gram_ratio,compression_score,FactCC_scores,ANLI_scores,SummaC_scores,BARTScores):
             text_table.add_data(i, p, l, r1,r2,rl,rs,novel_1g,novel_2g,novel_3g,compression_sc,FactCC_score,ANLI_score,SummaC_score,BARTScore)
 
+        # Log the the metrics
+        for key, value in metrics.items():
+            for v in value:
+                wandb.log({f'metric/{key}' : v})
+            
         wandb.run.log({'Eval_Samples' : text_table})
         
 
@@ -199,12 +204,16 @@ class LlamarizerEval():
         for batch in tqdm(eval_dataloader, "Evaluating"):
             # Decode labels
             labels = batch["labels"]
-            label_length = len(labels[labels != -100])
+
+            # Longest label per batch
+            label_length = max([len(x[x != -100]) for x in labels])
+            
             labels[labels == -100] = self.tokenizer.pad_token_id
             labels.to(self.model.device)
             labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
 
             # Run the inference
+            print(f"Label length: {label_length}")
             preds = self.run_inference(batch, label_length)
             inputs = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
 
@@ -215,12 +224,15 @@ class LlamarizerEval():
             # Log
             self.push_artifacts_table(inputs, preds, labels, metrics)
 
-            # Log the mean + std of each metrics
-            for key in metric_accumulation.keys():
-                # compute
-                mean = np.mean(metric_accumulation[key])
-                std = np.std(metric_accumulation[key])
 
-                # round and print
-                wandb.run.log({f'avg_mean/{key}' : round(mean, 3)})
-                wandb.run.log({f'avg_std/{key}' : round(std, 3)})
+        # Log the mean + std of each metrics
+        for key in metric_accumulation.keys():
+            # compute
+            mean = np.mean(metric_accumulation[key])
+            std = np.std(metric_accumulation[key])
+
+            # round and print
+            wandb.run.log({f'avg_mean/{key}' : round(mean, 3)})
+            wandb.run.log({f'avg_std/{key}' : round(std, 3)})
+            print(f"Logging {key} mean: {round(mean, 3)}")
+            print(f"Logging {key} std: {round(std, 3)}")
