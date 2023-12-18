@@ -1,6 +1,8 @@
 import src.ml.summarizer as s
 import src.datasets.xSum as xSum
 import src.utils.utilities as utils
+from src.utils.SummarizationMetrics import FactCC, ANLI, SummaC, SummarizationMetrics
+from src.utils.BARTScore.bart_score import BARTScorer
 import numpy as np
 import torch
 import wandb
@@ -33,16 +35,31 @@ class LlamarizerEval():
 
         # Metrics
         self.rouge = evaluate.load("rouge")
+        self.factcc = FactCC()
+        self.anli = ANLI()
+        self.summac = SummaC()
+        self.bart_scorer = BARTScorer(device='cuda:0', checkpoint='facebook/bart-large-cnn')
+        self.summarization_metrics = SummarizationMetrics()
 
 
-    def compute_metrics(self, predictions, labels):
+    def compute_metrics(self, inputs, predictions, labels):
         output = {}
         rouge_output = self.rouge.compute(predictions=predictions, references=labels)
-
+        summary_metrics_out = self.summarization_metrics.compute(inputs, predictions)
+        FactCC_score = self.factcc.compute(inputs, predictions)
+        ANLI_score = self.anli.compute(inputs, predictions)
+        SummaC_score = self.summac.compute(inputs, predictions)
+        BARTscores = self.bart_scorer.score(labels, predictions, batch_size=4)
+        BARTScore = np.mean(BARTscores)
         # Rouge
+        output.update(summary_metrics_out)
         output['rouge1'] = rouge_output['rouge1']
         output['rouge2'] = rouge_output['rouge2']
         output['rougeL'] = rouge_output['rougeL']
+        output['FactCC'] = FactCC_score
+        output['ANLI'] = ANLI_score
+        output['SummaC'] = SummaC_score
+        output['BARTScore'] = BARTScore
 
         wandb.log(output)
         return output
@@ -151,13 +168,14 @@ class LlamarizerEval():
 
             # Run the inference
             preds = self.run_inference(batch, label_length)
+            inputs = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
 
             # Compute the metrics
-            metrics = self.compute_metrics(preds, labels)
+            metrics = self.compute_metrics(inputs, preds, labels)
             metric_accumulation = self.merge_results(metric_accumulation, metrics)
 
             # Log
-            inputs = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
+            
             self.push_artifacts_table(inputs, preds, labels, metrics)
 
         # Log the mean + std of each metrics
