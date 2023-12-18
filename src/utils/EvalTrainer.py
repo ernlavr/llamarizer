@@ -15,6 +15,7 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 
+
 class CustomTrainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         nli_artifact = kwargs.pop("nli_artifact")

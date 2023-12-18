@@ -5,7 +5,7 @@ import numpy as np
 
 
 class XSum:
-    def __init__(self, tokenizer) -> None:
+    def __init__(self, tokenizer, no_summary=False) -> None:
         self.tokenizer = tokenizer
         dataset = datasets.load_dataset("EdinburghNLP/xsum")
         train = dataset["train"].shuffle(seed=42).select(range(wandb.config.train_size))
@@ -21,6 +21,10 @@ class XSum:
 
         val_set = val.map(self.apply_prompt_template)
         self.val_tokenized = self.preprocess(val_set)
+
+        if no_summary:
+            self.train_tokenized = self.preprocess(train_set, no_summary=True)
+            self.val_tokenized = self.preprocess(val_set, no_summary=True)
 
         
 
@@ -41,7 +45,7 @@ class XSum:
         }
 
 
-    def preprocess(self, dataset):
+    def preprocess(self, dataset, no_summary=False):
         tokenizer = self.tokenizer
         output = []
         skipped_counter = 0
@@ -59,6 +63,14 @@ class XSum:
                 "attention_mask": np.array([1] * len(prompt) + [0] * len(summary)),
                 "labels": np.array([-100] * len(prompt) + summary)
             }
+
+            if no_summary:
+                sample = {
+                    "input_ids": np.array(prompt),
+                    "attention_mask": np.array([1] * len(prompt)),
+                    "labels": np.array(summary)
+                }
+
             output.append(sample)
         print(f"Skipped {skipped_counter} examples")
         return output

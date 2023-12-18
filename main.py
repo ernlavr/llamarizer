@@ -5,6 +5,7 @@ import src.utils.utilities as utils
 from src.ml.summarizer import Summarizer
 import src.datasets.xSum as xSum
 import src.ml.nli as nli
+import src.ml.summarizerEvaluation as se
 
 from huggingface_hub.hf_api import HfFolder
 
@@ -60,6 +61,11 @@ def main():
         print("Train NLI")
         model = nli.NLI_Finetune()
         model.finetune()
+
+    if args.eval_summ:
+        print("Eval summarizer")
+        evaluator = se.LlamarizerEval()
+        evaluator.eval()
     
 
 

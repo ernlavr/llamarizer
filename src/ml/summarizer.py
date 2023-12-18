@@ -13,6 +13,7 @@ import transformers
 import src.ml.baseModel as bs
 import src.datasets.xSum as xSum
 import src.utils.EvalTrainer as et
+import src.utils.utilities as utils
 import src.utils.logging as logUtils
 import evaluate
 import numpy as np
@@ -48,55 +49,24 @@ class Summarizer(bs.BaseModel):
         # metrics
         self.rouge = evaluate.load("rouge")
 
-        # Tokenizer
-        print("Loading tokenizer")
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
+        # Quantization + LoRA configs
+        print("Loading model")
+        self.bnb_config = utils.get_bnb_config()
+        self.peft_config = utils.get_peft_config()
+
+        # Fetch model + tokenizerz
+        self.model, self.tokenizer = utils.get_model(self.model_name, self.load_in_4bit, self.peft_config, self.bnb_config)
+        if not self.model.config.pad_token_id:
+            self.model.config.pad_token_id = self.model.config.eos_token_id
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-            #self.tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-
+            
         # Dataset
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenizer)
-         # 0.5 epoch
+        # 0.5 epoch
         self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.train_batch_size / 2)
 
-        # Model
-        print("Loading model")
-        self.bnb_config = transformers.BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype="bfloat16",
-        )
-        self.peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            r=8,
-            lora_alpha=16,
-            lora_dropout=0.05,
-            bias="none"
-        )
-        self.model = self.get_model()
-        if not self.model.config.pad_token_id:
-            self.model.config.pad_token_id = self.model.config.eos_token_id
-            #self.model.resize_token_embeddings(self.model.config.vocab_size + 1)
-        
-
-    def get_model(self):
-        model = None
-        if self.load_in_4bit:
-            # TODO: review model loading according to llama-recipes
-            model = transformers.AutoModelForCausalLM.from_pretrained(
-                self.model_name, 
-                quantization_config=self.bnb_config,
-                device_map="auto"
-            )
-            model = prepare_model_for_kbit_training(model)
-            model = get_peft_model(model, self.peft_config)
-        else:
-            model = transformers.AutoModelForCausalLM.from_pretrained(self.model_name)
-
-        return model
 
     def compute_metrics(self, eval_pred):
         """Eval_pred consists of a tuple of predictions and labels
@@ -132,6 +102,7 @@ class Summarizer(bs.BaseModel):
         logUtils.push_artifacts_table("n/a", "n/a", rouge["rouge1"], rouge["rouge2"], )
 
         return {'rouge': rouge}
+
 
     def tokenize(self, text):
         return self.tokenizer(
