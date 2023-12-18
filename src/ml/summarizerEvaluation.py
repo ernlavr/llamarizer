@@ -117,7 +117,7 @@ class LlamarizerEval():
         
 
     def run_inference(self, batch, label_length):
-        # tokenize the text
+        # tokenize the tex
         self.model.eval()
         input_ids = batch['input_ids'].to('cuda')
         attention_mask = batch['attention_mask'].to('cuda')
