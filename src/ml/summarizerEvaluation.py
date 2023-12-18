@@ -121,7 +121,7 @@ class LlamarizerEval():
         self.model.eval()
         input_ids = batch['input_ids'].to('cuda')
         attention_mask = batch['attention_mask'].to('cuda')
-        seq_len = input_ids.shape[1] + label_length
+        seq_len = input_ids.shape[1] + label_length * 2
         
         input_ids.to('cuda')
         attention_mask.to('cuda')
@@ -129,7 +129,7 @@ class LlamarizerEval():
         summary_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            max_length=label_length * 2,
+            max_length=seq_len,
             repetition_penalty=self.rep_pen,
             length_penalty=-1.0,
         )
