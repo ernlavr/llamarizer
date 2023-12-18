@@ -12,9 +12,6 @@ from nltk import FreqDist
 from nltk.corpus import stopwords
 import nltk
 
-nltk.download('stopwords')
-logging.disable(logging.WARNING)
-
 class FactCC:
     def __init__(self, device = "cuda", model_path='manueldeprada/FactCC'):
         """
@@ -23,13 +20,12 @@ class FactCC:
         Args:
             model_path (str): The path or name of the pre-trained model to be used. Defaults to 'manueldeprada/FactCC'.
         """
-        if device == "cuda":
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device("cpu")
+
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.tokenizer = BertTokenizer.from_pretrained(model_path)
         self.model = BertForSequenceClassification.from_pretrained(model_path).to(self.device)
         self.model.eval()
+
     def compute(self, references,predictions):
             """
             Computes the FactCC score for a list of predicted sentences and their corresponding reference sentences.
@@ -57,15 +53,11 @@ class FactCC:
 class ANLI:
 
     def __init__(self,max_length = 512, model_name = "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli", device = "cuda"):
-
-        if device == "cuda":
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device("cpu")
-        
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
         self.max_length = max_length
+
     def compute(self, sources, summaries):
         
         preds = []
@@ -90,10 +82,7 @@ class ANLI:
 class SummaC:
 
     def __init__(self,device = "cuda"):
-        if device == "cuda":
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else: 
-            self.device = torch.device("cpu")
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.model = SummaCConv(models=["vitc"], bins='percentile', granularity="sentence", nli_labels="e", device=self.device, start_file="default", agg="mean") 
 
     def compute(self, sources, summaries):

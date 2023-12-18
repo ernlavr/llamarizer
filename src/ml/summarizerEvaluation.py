@@ -3,6 +3,7 @@ import src.datasets.xSum as xSum
 import src.utils.utilities as utils
 from src.utils.SummarizationMetrics import FactCC, ANLI, SummaC, SummarizationMetrics
 from src.utils.BARTScore.bart_score import BARTScorer
+import nltk
 import numpy as np
 import torch
 import wandb
@@ -15,10 +16,12 @@ class LlamarizerEval():
         self.bnb_config = utils.get_bnb_config()
         self.peft_config = utils.get_peft_config()
 
-        wandb_output = utils.get_model(wandb.config.model_name, 
-                                             load_in_4bit=False, 
-                                             peft_config=None, 
-                                             bnb_config=None)
+        print(wandb.config.model_name)
+
+        wandb_output = utils.load_from_wandb(wandb.config.model_name, 
+                                             load_in_4bit=wandb.config.load_in_4bit, 
+                                             peft_config=self.peft_config, 
+                                             bnb_config=self.bnb_config)
         self.model = wandb_output[0]
         self.tokenizer = wandb_output[1]
 
@@ -33,23 +36,36 @@ class LlamarizerEval():
         self.sequence_length = wandb.config.sequence_length
         self.eval_batch = wandb.config.eval_batch_size
 
+        # Download the nltk punkt tokenizer
+        nltk.download('punkt')
+
         # Metrics
         self.rouge = evaluate.load("rouge")
-        self.factcc = FactCC(device = 'cpu')
-        self.anli = ANLI(device= 'cpu')
-        self.summac = SummaC()
-        self.bart_scorer = BARTScorer(device='cpu', checkpoint='facebook/bart-large-cnn')
+        self.factcc = FactCC('cuda:1')
+        self.anli = ANLI('cuda:1')
+        #self.summac = SummaC('cuda:1')
+        #self.bart_scorer = BARTScorer(checkpoint='facebook/bart-large-cnn')
         self.summarization_metrics = SummarizationMetrics()
+        print("Initialized LlamarizerEval")
 
 
     def compute_metrics(self, inputs, predictions, labels):
+        print("Computing metrics")
         output = {}
         rouge_output = self.rouge.compute(predictions=predictions, references=labels,use_aggregator=False)
         summary_metrics_out = self.summarization_metrics.compute(inputs, predictions)
+
+        # # Compute FactCC
         FactCC_score = self.factcc.compute(inputs, predictions)
+
+        # # Compute ANLI
         ANLI_score = self.anli.compute(inputs, predictions)
-        SummaC_score = self.summac.compute(inputs, predictions)
-        BARTscores = self.bart_scorer.score(labels, predictions, batch_size=4)
+
+        # # Compute SummaC
+        # SummaC_score = self.summac.compute(inputs, predictions)
+
+        # # Compute BART
+        # BARTscores = self.bart_scorer.score(labels, predictions, batch_size=self.eval_batch)
         
         # Rouge
         output.update(summary_metrics_out)
@@ -58,8 +74,8 @@ class LlamarizerEval():
         output['rougeL'] = rouge_output['rougeL']
         output['FactCC'] = FactCC_score
         output['ANLI'] = ANLI_score
-        output['SummaC'] = SummaC_score
-        output['BARTScore'] = BARTscores
+        output['SummaC'] = [-1]  * len(rouge_output['rouge1']) #SummaC_score
+        output['BARTScore'] = [-1]  * len(rouge_output['rouge1']) #BARTscores
 
         wandb.log(output)
         return output
@@ -82,6 +98,20 @@ class LlamarizerEval():
         SummaC_scores=metrics["SummaC"]
         BARTScores=metrics["BARTScore"]
 
+        # print all metric types
+        print(f"r1s: {type(r1s)}")
+        print(f"r2s: {type(r2s)}")
+        print(f"rls: {type(rls)}")
+        print(f"red_score: {type(red_score)}")
+        print(f"novel_1gram_ratio: {type(novel_1gram_ratio)}")
+        print(f"novel_2gram_ratio: {type(novel_2gram_ratio)}")
+        print(f"novel_3gram_ratio: {type(novel_3gram_ratio)}")
+        print(f"compression_score: {type(compression_score)}")
+        print(f"FactCC_scores: {type(FactCC_scores)}")
+        print(f"ANLI_scores: {type(ANLI_scores)}")
+        print(f"SummaC_scores: {type(SummaC_scores)}")
+        print(f"BARTScores: {type(BARTScores)}")
+
         text_table = wandb.Table(columns=["inputs", "pred", "ref", "R1", "R2", "RougeL",
                                           'red_score', 'novel_1gram_ratio', 'novel_2gram_ratio', 'novel_3gram_ratio', 'compression_score', 'FactCC', 'ANLI', 'SummaC', 'BARTScore'])
 
@@ -99,6 +129,14 @@ class LlamarizerEval():
         seq_len = input_ids.shape[1] + label_length
 
         # generate the summary
+        # print devices
+        print(f"input_ids device: {input_ids.device}")
+        print(f"attention_mask device: {attention_mask.device}")
+        print(f"model device: {self.model.device}")
+        
+        input_ids.to(self.model.device)
+        attention_mask.to(self.model.device)
+
         summary_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -158,6 +196,7 @@ class LlamarizerEval():
         return buffer
 
     def eval(self):
+        print("Starting evaluation")
         self.model.eval()
         
         # evaluate in batches
@@ -174,6 +213,7 @@ class LlamarizerEval():
             labels = batch["labels"]
             label_length = len(labels[labels != -100])
             labels[labels == -100] = self.tokenizer.pad_token_id
+            labels.to(self.model.device)
             labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
 
             # Run the inference
@@ -185,7 +225,6 @@ class LlamarizerEval():
             metric_accumulation = self.merge_results(metric_accumulation, metrics)
 
             # Log
-            
             self.push_artifacts_table(inputs, preds, labels, metrics)
 
         # Log the mean + std of each metrics

@@ -3,7 +3,7 @@
 #SBATCH --output=simple.out # Name of output file
 #SBATCH --cpus-per-task=8 # Schedule one core
 #SBATCH --time=24:00:00 # Run time (hh:mm:ss)
-#SBATCH --gres=gpu:a100_40gb:1 # Request a GPU
+#SBATCH --gres=gpu:a100_40gb:2 # Request a GPU
 #SBATCH --partition=brown
 #SBATCH --output=job.%j.out # (%j expands to jobId)
 #SBATCH --mail-type=FAIL
