@@ -55,7 +55,7 @@ class Summarizer(bs.BaseModel):
         self.peft_config = utils.get_peft_config()
 
         # Fetch model + tokenizerz
-        self.model, self.tokenizer = utils.get_model(self.model_name, self.load_in_4bit, self.bnb_config, self.peft_config)
+        self.model, self.tokenizer = utils.get_model(self.model_name, self.load_in_4bit, self.peft_config, self.bnb_config)
         if not self.model.config.pad_token_id:
             self.model.config.pad_token_id = self.model.config.eos_token_id
         if not self.tokenizer.pad_token:

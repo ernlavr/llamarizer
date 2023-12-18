@@ -18,5 +18,5 @@ echo "Starting python"
 python3 main.py --args_path conf/args.yaml
 
 # sweep
-#wandb agent ernlavr/adv_nlp2023/5hy77g7k
+# wandb agent ernlavr/adv_nlp2023/mbg3fpxw
 echo "Done ./run_hpc.sh"

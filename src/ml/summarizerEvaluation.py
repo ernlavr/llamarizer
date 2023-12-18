@@ -16,13 +16,20 @@ class LlamarizerEval():
         self.bnb_config = utils.get_bnb_config()
         self.peft_config = utils.get_peft_config()
 
-        print(wandb.config.model_name)
+        # Hacky way to ensure we either load WANDB or HuggingFace
+        mn = wandb.config.model_name
+        if mn.count('/') == 2 and ':' in mn:
+            wandb_output = utils.load_from_wandb(wandb.config.model_name, 
+                                load_in_4bit=wandb.config.load_in_4bit, 
+                                peft_config=self.peft_config, 
+                                bnb_config=self.bnb_config)
+        else:
+            wandb_output = utils.get_model(wandb.config.model_name, 
+                                load_in_4bit=wandb.config.load_in_4bit, 
+                                peft_config=self.peft_config, 
+                                bnb_config=self.bnb_config)
 
-        wandb_output = utils.load_from_wandb(wandb.config.model_name, 
-                                             load_in_4bit=wandb.config.load_in_4bit, 
-                                             peft_config=self.peft_config, 
-                                             bnb_config=self.bnb_config)
-        self.model = wandb_output[0]
+        self.model = wandb_output[0].to('cuda')
         self.tokenizer = wandb_output[1]
 
         if not self.model.config.pad_token_id:
@@ -35,6 +42,7 @@ class LlamarizerEval():
         # Hyperparameters
         self.sequence_length = wandb.config.sequence_length
         self.eval_batch = wandb.config.eval_batch_size
+        self.rep_pen = wandb.config.repetition_penalty
 
         # Download the nltk punkt tokenizer
         nltk.download('punkt')
@@ -124,8 +132,8 @@ class LlamarizerEval():
     def run_inference(self, batch, label_length):
         # tokenize the text
         self.model.eval()
-        input_ids = batch['input_ids'].to(self.model.device)
-        attention_mask = batch['attention_mask'].to(self.model.device)
+        input_ids = batch['input_ids'].to('cuda')
+        attention_mask = batch['attention_mask'].to('cuda')
         seq_len = input_ids.shape[1] + label_length
 
         # generate the summary
@@ -140,9 +148,7 @@ class LlamarizerEval():
         summary_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            max_length=seq_len,
-            repetition_penalty=1.25,
-            length_penalty=-1,
+            max_length=512
         )
 
         # decode the summary
@@ -208,6 +214,7 @@ class LlamarizerEval():
 
         # run inference
         metric_accumulation = {}
+        print("Starting eval loop")
         for batch in eval_dataloader:
             # Decode labels
             labels = batch["labels"]
@@ -227,11 +234,12 @@ class LlamarizerEval():
             # Log
             self.push_artifacts_table(inputs, preds, labels, metrics)
 
-        # Log the mean + std of each metrics
-        for key in metric_accumulation.keys():
-            # compute
-            mean = np.mean(metric_accumulation[key])
-            std = np.std(metric_accumulation[key])
+            # Log the mean + std of each metrics
+            for key in metric_accumulation.keys():
+                # compute
+                mean = np.mean(metric_accumulation[key])
+                std = np.std(metric_accumulation[key])
 
-            # round and print
-            print(f"{key}: {round(mean, 3)} +- {round(std, 3)}")
+                # round and print
+                wandb.run.log({f'avg_mean/{key}' : round(mean, 3)})
+                wandb.run.log({f'avg_std/{key}' : round(std, 3)})

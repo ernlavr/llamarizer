@@ -1,13 +1,13 @@
 # control
 wandb_mode : "online"
 save_model_at_end : True
-train_summ : False
-train_with_nli : False
+train_summ : True
+train_with_nli : True
 train_nli : False
-eval_summ : True
+eval_summ : False
 
 # Hyperparameters
-learning_rate: 1e-4
+learning_rate: 1e-3
 epochs: 2
 weight_decay : 0.01
 batch_size : 4
@@ -16,6 +16,7 @@ sequence_length : 512
 model_name : "ernlavr/adv_nlp2023/model_glwgz9uz:v0"
 repetition_penalty : 1.25
 eval_steps : 25  # processing steps before evaluation takes place
+
 
 # evaluation
 wandb_num_examples : 10  # number of examples to save in W&B table
