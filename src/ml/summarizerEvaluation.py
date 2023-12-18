@@ -35,22 +35,22 @@ class LlamarizerEval():
 
         # Metrics
         self.rouge = evaluate.load("rouge")
-        self.factcc = FactCC()
-        self.anli = ANLI()
+        self.factcc = FactCC(device = 'cpu')
+        self.anli = ANLI(device= 'cpu')
         self.summac = SummaC()
-        self.bart_scorer = BARTScorer(device='cuda:0', checkpoint='facebook/bart-large-cnn')
+        self.bart_scorer = BARTScorer(device='cpu', checkpoint='facebook/bart-large-cnn')
         self.summarization_metrics = SummarizationMetrics()
 
 
     def compute_metrics(self, inputs, predictions, labels):
         output = {}
-        rouge_output = self.rouge.compute(predictions=predictions, references=labels)
+        rouge_output = self.rouge.compute(predictions=predictions, references=labels,use_aggregator=False)
         summary_metrics_out = self.summarization_metrics.compute(inputs, predictions)
         FactCC_score = self.factcc.compute(inputs, predictions)
         ANLI_score = self.anli.compute(inputs, predictions)
         SummaC_score = self.summac.compute(inputs, predictions)
         BARTscores = self.bart_scorer.score(labels, predictions, batch_size=4)
-        BARTScore = np.mean(BARTscores)
+        
         # Rouge
         output.update(summary_metrics_out)
         output['rouge1'] = rouge_output['rouge1']
@@ -59,7 +59,7 @@ class LlamarizerEval():
         output['FactCC'] = FactCC_score
         output['ANLI'] = ANLI_score
         output['SummaC'] = SummaC_score
-        output['BARTScore'] = BARTScore
+        output['BARTScore'] = BARTscores
 
         wandb.log(output)
         return output
@@ -69,14 +69,24 @@ class LlamarizerEval():
         """ Returns a wandb.Table object containing all the artifacts
             in the run
         """
-        r1 = metrics["rouge1"]
-        r2 = metrics["rouge2"]
-        rl = metrics["rougeL"]
+        r1s = metrics["rouge1"]
+        r2s = metrics["rouge2"]
+        rls = metrics["rougeL"]
+        red_score=metrics["red_score"]
+        novel_1gram_ratio=metrics["novel_1gram_ratio"]
+        novel_2gram_ratio=metrics["novel_2gram_ratio"]
+        novel_3gram_ratio=metrics["novel_3gram_ratio"]
+        compression_score=metrics["compression_score"]
+        FactCC_scores=metrics["FactCC"]
+        ANLI_scores=metrics["ANLI"]
+        SummaC_scores=metrics["SummaC"]
+        BARTScores=metrics["BARTScore"]
 
-        text_table = wandb.Table(columns=["inputs", "pred", "ref", "R1", "R2", "RougeL"])
+        text_table = wandb.Table(columns=["inputs", "pred", "ref", "R1", "R2", "RougeL",
+                                          'red_score', 'novel_1gram_ratio', 'novel_2gram_ratio', 'novel_3gram_ratio', 'compression_score', 'FactCC', 'ANLI', 'SummaC', 'BARTScore'])
 
-        for (i, p, l) in zip(inputs, preds, labels):
-            text_table.add_data(i, p, l, r1, r2, rl)
+        for (i, p, l,r1,r2,rl,rs,novel_1g,novel_2g,novel_3g,compression_sc,FactCC_score,ANLI_score,SummaC_score,BARTScore ) in zip(inputs, preds, labels,r1s,r2s,rls,red_score,novel_1gram_ratio,novel_2gram_ratio,novel_3gram_ratio,compression_score,FactCC_scores,ANLI_scores,SummaC_scores,BARTScores):
+            text_table.add_data(i, p, l, r1,r2,rl,rs,novel_1g,novel_2g,novel_3g,compression_sc,FactCC_score,ANLI_score,SummaC_score,BARTScore)
 
         wandb.run.log({'Eval_Samples' : text_table})
         
