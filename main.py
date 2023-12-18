@@ -15,11 +15,11 @@ log.setLevel(logging.DEBUG)
 
 
 def setupEnvVariables(args):
-    os.environ["WANDB_API_KEY"] = "3e554d2dafac7c22b4e348afff4b69a9e6d49e81"
+    os.environ["WANDB_API_KEY"] = "ENTER_KEY_HERE"
     os.environ["WANDB_PROJECT"] = "adv_nlp2023"
     os.environ["WANDB_MODE"] = args.wandb_mode
     #os.environ["WANDB_LOG_MODEL"] = "end"  # 'checkpoint' or
-    os.environ["HF_TOKEN"] = "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"
+    os.environ["HF_TOKEN"] = "ENTER_TOKEN_HERE"
     HfFolder.save_token(os.environ["HF_TOKEN"])
 
 
@@ -51,7 +51,7 @@ def main():
     setupEnvVariables(args)
     print("Init wandb")
     run = initWandb(args)
-    print("Init summarizer")
+    
     if args.train_summ:
         print("Train summarizer")
         summarizer = Summarizer()
