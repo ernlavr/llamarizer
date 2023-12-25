@@ -1,5 +1,5 @@
 # Llamarizer
-Advanced NLP 2023 @ ITU Copenhagen course work. Tested and developed on Python 3.10 and Ubuntu 22, NVidia A100 GPU.
+Fine-tuning and evaluation of Llama2-7bn model for news summary with a focus on factuality. Part of Advanced NLP 2023 @ ITU Copenhagen course work. Tested and developed on Python 3.10 and Ubuntu 22, NVidia A100 GPU.
 
 ## To run
 0. Start by cloning `git clone <REPO> --recursive`, the `--recursive` flag is 
