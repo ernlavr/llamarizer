@@ -1,6 +1,10 @@
 # Llamarizer
 Fine-tuning and evaluation of Llama2-7bn model for news summary with a focus on factuality. Part of Advanced NLP 2023 @ ITU Copenhagen course work. Tested and developed on Python 3.10 and Ubuntu 22, NVidia A100 GPU.
 
+[Base model](https://huggingface.co/ernlavr/llama-2-7bn-xsum-lora-adapter)
+[Weights and Biases](https://wandb.ai/ernlavr/adv_nlp2023/sweeps)
+[Paper](https://ernlavr.github.io/portfolio/portfolio-5/)
+
 ## To run
 0. Start by cloning `git clone <REPO> --recursive`, the `--recursive` flag is 
 for cloning `BARTScore` evaluation repository
