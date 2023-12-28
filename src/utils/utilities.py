@@ -21,6 +21,7 @@ def getArgs():
     parser.add_argument("--train_nli", type=bool, default=False, help="Fine-tune NLI")
     parser.add_argument("--train_with_nli", type=bool, default=False, help="Train summarizer with NLI")
     parser.add_argument("--eval_summ", type=bool, default=False, help="Train Summarizer")
+    parser.add_argument("--add_cnn_dailymail", type=bool, default=False, help="Add CNN/DM dataset to the mix")
 
     # model hyperparameters
     parser.add_argument(
@@ -94,6 +95,10 @@ def load_from_wandb(id, load_in_4bit, peft_config, bnb_config):
 
     return get_model(artifact_dir, load_in_4bit, peft_config, bnb_config)
 
+def get_fsdp_model(id):
+    model = transformers.AutoModelForCausalLM.from_pretrained(id)
+    model = FSDP(model)
+    return model
 
 def get_model(id, load_in_4bit=False, peft_config=None, bnb_config=None):
     model = None

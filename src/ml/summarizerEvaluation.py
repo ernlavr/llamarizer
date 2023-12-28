@@ -134,7 +134,14 @@ class LlamarizerEval():
         summary_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=label_length * 2
+            max_new_tokens=label_length * 2,
+            num_beams=5,
+            temperature=0.7,
+            top_k=50,
+            top_p=0.95,
+            repetition_penalty=1.2,
+            length_penalty=1.0,
+            no_repeat_ngram_size=2
         )
 
         # decode the summary

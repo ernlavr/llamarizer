@@ -65,7 +65,7 @@ class Summarizer(bs.BaseModel):
         print("Loading dataset")
         self.dataset = xSum.XSum(self.tokenizer)
         # 0.5 epoch
-        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.train_batch_size / 2)
+        self.warm_up_steps = int(len(self.dataset.train_tokenized) / self.train_batch_size / 2) / 8
 
 
     def compute_metrics(self, eval_pred):
@@ -194,13 +194,13 @@ class Summarizer(bs.BaseModel):
             eval_accumulation_steps=8,
             
             # huggingface
-            push_to_hub_model_id="llama2-7bn-" + "4bit-xsum",
+            push_to_hub_model_id="llama2-13bn-" + "xsum-cnn-adapter",
             hub_token="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",
             load_best_model_at_end=True,
             # model quantization stuff
             fp16=wandb.config.load_in_4bit,
             gradient_checkpointing=wandb.config.load_in_4bit,   
-            gradient_accumulation_steps=1,     
+            gradient_accumulation_steps=2,  
             optim = "paged_adamw_32bit" if wandb.config.load_in_4bit else "adamw_torch"
         )
         
@@ -218,6 +218,7 @@ class Summarizer(bs.BaseModel):
         trainer.train()
         
         if wandb.config.save_model_at_end:
+            trainer.push_to_hub()
             self.save_model(trainer)
 
     def predict(self, X):
